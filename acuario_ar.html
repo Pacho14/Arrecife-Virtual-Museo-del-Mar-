@@ -165,6 +165,33 @@
             display: block;
         }
 
+        #canvas-aquarium.hidden {
+            display: none;
+        }
+
+        .triple-projection-container {
+            display: none;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0;
+            height: 400px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 3px solid #667eea;
+        }
+
+        .triple-projection-container.active {
+            display: grid;
+        }
+
+        .triple-projection-container canvas {
+            background: linear-gradient(to bottom, #87CEEB 0%, #4A90E2 50%, #2E5C8A 100%);
+            border-right: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .triple-projection-container canvas:last-child {
+            border-right: none;
+        }
+
         .fish-count {
             padding: 10px;
             background: #f5f5f5;
@@ -172,6 +199,28 @@
             text-align: center;
             font-weight: bold;
             color: #333;
+        }
+
+        .projection-control {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .projection-control label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+        }
+
+        .projection-control input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
         }
 
         .instructions {
@@ -213,7 +262,7 @@
             <h3>📋 Instrucciones:</h3>
             <ol>
                 <li>Asegúrate de que tu cámara esté habilitada</li>
-                <li>Apunta a uno de los marcadores (PEZ2.mind o payaso.mind)</li>
+                <li>Apunta a uno de los marcadores (PEZ2.mind, payaso.mind, pez3.mind o pez4.mind)</li>
                 <li>Cuando aparezca el botón verde, captura la imagen</li>
                 <li>El fondo blanco se eliminará automáticamente</li>
                 <li>Los peces aparecerán nadando en el acuario</li>
@@ -234,7 +283,18 @@
 
             <div class="aquarium-section">
                 <h2>🐟 Mi Acuario</h2>
+                <div class="projection-control">
+                    <label>
+                        <input type="checkbox" id="triple-projection-toggle">
+                        📺 3 Proyecciones
+                    </label>
+                </div>
                 <canvas id="canvas-aquarium"></canvas>
+                <div class="triple-projection-container" id="triple-projection-container">
+                    <canvas id="canvas-projection-1"></canvas>
+                    <canvas id="canvas-projection-2"></canvas>
+                    <canvas id="canvas-projection-3"></canvas>
+                </div>
                 <div class="fish-count">
                     Peces capturados: <span id="fish-count">0</span>
                 </div>
@@ -250,6 +310,9 @@
         let fishes = [];
         let markerMinAR = null;
         let started = false;
+        let tripleProjectionActive = false;
+        let projectionCanvases = [];
+        let projectionContexts = [];
 
         // ==================== ELEMENTOS DEL DOM ====================
         const videoCameraEl = document.getElementById('video-camera');
@@ -259,6 +322,8 @@
         const btnCapture = document.getElementById('btn-capture');
         const btnClear = document.getElementById('btn-clear');
         const fishCountEl = document.getElementById('fish-count');
+        const tripleProjectionToggle = document.getElementById('triple-projection-toggle');
+        const tripleProjectionContainer = document.getElementById('triple-projection-container');
 
         // ==================== INICIALIZACIÓN ====================
         async function init() {
@@ -498,7 +563,6 @@
             }, 100);
         }
 
-
         // ==================== CAPTURAR Y PROCESAR IMAGEN ====================
         function captureAndProcessImage() {
             if (!cameraActive) {
@@ -582,6 +646,21 @@
         function setupAquarium() {
             canvasAquariumEl.width = canvasAquariumEl.clientWidth;
             canvasAquariumEl.height = canvasAquariumEl.clientHeight;
+            
+            // Configurar canvas de proyecciones si están activas
+            if (tripleProjectionActive) {
+                projectionCanvases = [
+                    document.getElementById('canvas-projection-1'),
+                    document.getElementById('canvas-projection-2'),
+                    document.getElementById('canvas-projection-3')
+                ];
+                projectionContexts = projectionCanvases.map(canvas => {
+                    canvas.width = canvas.clientWidth;
+                    canvas.height = canvas.clientHeight;
+                    return canvas.getContext('2d');
+                });
+            }
+            
             animateAquarium();
         }
 
@@ -590,99 +669,110 @@
         let time = 0;
 
         function animateAquarium() {
-            ctxAquarium.clearRect(0, 0, canvasAquariumEl.width, canvasAquariumEl.height);
-
-            // Gradiente de agua
-            const gradient = ctxAquarium.createLinearGradient(0, 0, 0, canvasAquariumEl.height);
-            gradient.addColorStop(0, '#87CEEB');
-            gradient.addColorStop(0.5, '#4A90E2');
-            gradient.addColorStop(1, '#2E5C8A');
-            ctxAquarium.fillStyle = gradient;
-            ctxAquarium.fillRect(0, 0, canvasAquariumEl.width, canvasAquariumEl.height);
-
-            // Arena en el fondo
-            drawSand();
-
-            // Plantas acuáticas
-            drawWaterPlants();
-
-            // Rayos de luz
-            drawLightRays();
-
-            // Burbujas
-            drawBubbles();
-
-            // Actualizar y dibujar peces
-            updateAndDrawFishes();
-
-            // Ondas en la superficie
-            drawWaveSurface();
+            drawAquariumScene(ctxAquarium, canvasAquariumEl);
+            
+            // Si está activa la proyección triple, dibujar en los 3 canvas
+            if (tripleProjectionActive && projectionContexts.length === 3) {
+                for (let i = 0; i < 3; i++) {
+                    drawAquariumScene(projectionContexts[i], projectionCanvases[i]);
+                }
+            }
 
             time += 0.03;
             requestAnimationFrame(animateAquarium);
         }
 
+        function drawAquariumScene(ctx, canvas) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Gradiente de agua
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(0.5, '#4A90E2');
+            gradient.addColorStop(1, '#2E5C8A');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Arena en el fondo
+            drawSand(ctx, canvas);
+
+            // Plantas acuáticas
+            drawWaterPlants(ctx, canvas);
+
+            // Rayos de luz
+            drawLightRays(ctx, canvas);
+
+            // Burbujas
+            drawBubbles(ctx, canvas);
+
+            // Actualizar y dibujar peces
+            updateAndDrawFishes(ctx, canvas);
+
+            // Ondas en la superficie
+            drawWaveSurface(ctx, canvas);
+        }
+
         // ==================== DIBUJAR ARENA ====================
-        function drawSand() {
-            ctxAquarium.fillStyle = 'rgba(210, 180, 140, 0.8)';
-            ctxAquarium.fillRect(0, canvasAquariumEl.height - 40, canvasAquariumEl.width, 40);
+        function drawSand(ctx, canvas) {
+            ctx.fillStyle = 'rgba(210, 180, 140, 0.8)';
+            ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
 
             // Granitos de arena
-            ctxAquarium.fillStyle = 'rgba(180, 140, 100, 0.4)';
+            ctx.fillStyle = 'rgba(180, 140, 100, 0.4)';
             for (let i = 0; i < 50; i++) {
-                const x = Math.random() * canvasAquariumEl.width;
-                const y = canvasAquariumEl.height - Math.random() * 30 - 5;
+                const x = Math.random() * canvas.width;
+                const y = canvas.height - Math.random() * 30 - 5;
                 const size = Math.random() * 3;
-                ctxAquarium.fillRect(x, y, size, size);
+                ctx.fillRect(x, y, size, size);
             }
         }
 
         // ==================== DIBUJAR PLANTAS ACUÁTICAS ====================
-        function drawWaterPlants() {
-            ctxAquarium.strokeStyle = 'rgba(34, 139, 34, 0.6)';
-            ctxAquarium.lineWidth = 3;
+        function drawWaterPlants(ctx, canvas) {
+            ctx.strokeStyle = 'rgba(34, 139, 34, 0.6)';
+            ctx.lineWidth = 3;
 
-            const plantPositions = [50, 200, 350, canvasAquariumEl.width - 100];
+            const plantPositions = [50, 200, 350, canvas.width - 100];
             plantPositions.forEach((x, i) => {
-                drawPlant(x, canvasAquariumEl.height, i);
+                drawPlant(x, canvas.height, i, ctx);
             });
         }
 
-        function drawPlant(x, y, index) {
+        function drawPlant(x, y, index, ctx) {
             const wave = Math.sin(time * 2 + index) * 15;
-            ctxAquarium.beginPath();
-            ctxAquarium.moveTo(x, y);
+            ctx.beginPath();
+            ctx.moveTo(x, y);
 
             for (let i = 0; i < 5; i++) {
                 const px = x + Math.sin(time * 2 + index + i * 0.5) * 20;
                 const py = y - i * 30;
-                ctxAquarium.lineTo(px, py);
+                ctx.lineTo(px, py);
             }
-            ctxAquarium.stroke();
+            ctx.stroke();
         }
 
         // ==================== DIBUJAR RAYOS DE LUZ ====================
-        function drawLightRays() {
-            ctxAquarium.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctxAquarium.lineWidth = 15;
+        function drawLightRays(ctx, canvas) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 15;
 
             for (let i = 0; i < 3; i++) {
-                const x = (i * canvasAquariumEl.width + time * 100) % canvasAquariumEl.width;
-                ctxAquarium.beginPath();
-                ctxAquarium.moveTo(x, 0);
-                ctxAquarium.lineTo(x + 30, canvasAquariumEl.height);
-                ctxAquarium.stroke();
+                const x = (i * canvas.width + time * 100) % canvas.width;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x + 30, canvas.height);
+                ctx.stroke();
             }
         }
 
         // ==================== DIBUJAR BURBUJAS ====================
         const bubbles = [];
-        function drawBubbles() {
+        function drawBubbles(ctx, canvas) {
             // Crear burbujas ocasionalmente
             if (Math.random() < 0.03) {
                 bubbles.push({
-                    x: Math.random() * canvasAquariumEl.width,
-                    y: canvasAquariumEl.height,
+                    x: Math.random() * canvas.width,
+                    y: canvas.height,
                     radius: Math.random() * 5 + 2,
                     vy: -Math.random() * 1 - 0.5,
                     vx: (Math.random() - 0.5) * 0.5
@@ -695,13 +785,13 @@
                 bubble.x += bubble.vx;
                 bubble.y += bubble.vy;
 
-                ctxAquarium.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                ctxAquarium.beginPath();
-                ctxAquarium.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2);
-                ctxAquarium.fill();
-                ctxAquarium.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                ctxAquarium.lineWidth = 1;
-                ctxAquarium.stroke();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.beginPath();
+                ctx.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
 
                 if (bubble.y < 0) {
                     bubbles.splice(i, 1);
@@ -710,15 +800,15 @@
         }
 
         // ==================== ACTUALIZAR Y DIBUJAR PECES ====================
-        function updateAndDrawFishes() {
+        function updateAndDrawFishes(ctx, canvas) {
             fishes.forEach(fish => {
                 // Actualizar posición
                 fish.x += fish.vx;
                 fish.y += fish.vy;
 
                 // Rebotar en los límites
-                if (fish.x < 0 || fish.x > canvasAquariumEl.width) fish.vx *= -1;
-                if (fish.y < 0 || fish.y > canvasAquariumEl.height - 50) fish.vy *= -1;
+                if (fish.x < 0 || fish.x > canvas.width) fish.vx *= -1;
+                if (fish.y < 0 || fish.y > canvas.height - 50) fish.vy *= -1;
 
                 // Movimiento ondulante
                 fish.vy += Math.sin(time + fish.id) * 0.02;
@@ -726,16 +816,16 @@
                 else fish.rotation = Math.PI;
 
                 // Dibujar pez
-                drawScaledFish(fish);
+                drawScaledFish(fish, ctx);
             });
         }
 
-        function drawScaledFish(fish) {
-            ctxAquarium.save();
-            ctxAquarium.translate(fish.x, fish.y);
-            ctxAquarium.rotate(fish.rotation);
-            ctxAquarium.scale(fish.scale, fish.scale);
-            ctxAquarium.globalAlpha = 0.8;
+        function drawScaledFish(fish, ctx) {
+            ctx.save();
+            ctx.translate(fish.x, fish.y);
+            ctx.rotate(fish.rotation);
+            ctx.scale(fish.scale, fish.scale);
+            ctx.globalAlpha = 0.8;
 
             // Crear un canvas temporal para la imagen del pez
             const tempCanvas = document.createElement('canvas');
@@ -745,7 +835,7 @@
             tempCtx.putImageData(fish.imageData, 0, 0);
 
             // Dibujar la imagen del pez escalada
-            ctxAquarium.drawImage(
+            ctx.drawImage(
                 tempCanvas,
                 -tempCanvas.width / 2,
                 -tempCanvas.height / 2,
@@ -753,22 +843,22 @@
                 tempCanvas.height
             );
 
-            ctxAquarium.restore();
+            ctx.restore();
         }
 
         // ==================== DIBUJAR ONDAS EN LA SUPERFICIE ====================
-        function drawWaveSurface() {
-            ctxAquarium.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-            ctxAquarium.lineWidth = 2;
-            ctxAquarium.beginPath();
+        function drawWaveSurface(ctx, canvas) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
 
-            for (let x = 0; x <= canvasAquariumEl.width; x += 10) {
+            for (let x = 0; x <= canvas.width; x += 10) {
                 const y = 20 + Math.sin(x * 0.01 + time * 3) * 8;
-                if (x === 0) ctxAquarium.moveTo(x, y);
-                else ctxAquarium.lineTo(x, y);
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
             }
 
-            ctxAquarium.stroke();
+            ctx.stroke();
         }
 
         // ==================== EVENT LISTENERS ====================
@@ -776,6 +866,14 @@
         btnClear.addEventListener('click', () => {
             fishes = [];
             fishCountEl.textContent = '0';
+        });
+
+        // Control de proyección triple
+        tripleProjectionToggle.addEventListener('change', (e) => {
+            tripleProjectionActive = e.target.checked;
+            canvasAquariumEl.classList.toggle('hidden', tripleProjectionActive);
+            tripleProjectionContainer.classList.toggle('active', tripleProjectionActive);
+            setupAquarium();
         });
 
         // Manejar redimensionamiento
