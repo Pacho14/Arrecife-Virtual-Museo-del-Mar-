@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acuario con AR - MindAR</title>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.11/dist/mindar-image.prod.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+            min-height: 600px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+        }
+
+        .camera-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .camera-section h2,
+        .aquarium-section h2 {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        #canvas-camera {
+            display: none;
+        }
+
+        #video-camera {
+            border: 3px solid #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px 25px;
+            font-size: 1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 150px;
+        }
+
+        .btn-capture {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-capture:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn-capture:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-clear {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-clear:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
+        }
+
+        .status {
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .status.detected {
+            background: #e8f5e9;
+            color: #4CAF50;
+        }
+
+        .status.not-detected {
+            background: #ffebee;
+            color: #f44336;
+        }
+
+        .aquarium-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #canvas-aquarium {
+            width: 100%;
+            height: 400px;
+            background: linear-gradient(to bottom, #87CEEB 0%, #4A90E2 50%, #2E5C8A 100%);
+            border-radius: 10px;
+            border: 3px solid #667eea;
+            display: block;
+        }
+
+        .fish-count {
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .instructions {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+        }
+
+        .instructions h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+            color: #856404;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+        }
+
+        #hidden-camera {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐠 Acuario AR 🐠</h1>
+            <p>Detecta cualquier marcador, captura peces y acumúlalos en el acuario</p>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 Instrucciones:</h3>
+            <ol>
+                <li>Asegúrate de que tu cámara esté habilitada</li>
+                <li>Apunta a uno de los marcadores (PEZ2.mind o payaso.mind)</li>
+                <li>Cuando aparezca el botón verde, captura la imagen</li>
+                <li>El fondo blanco se eliminará automáticamente</li>
+                <li>Los peces aparecerán nadando en el acuario</li>
+                <li>¡Captura múltiples veces para llenar el acuario!</li>
+            </ol>
+        </div>
+
+        <div class="content">
+            <div class="camera-section">
+                <h2>📸 Cámara AR</h2>
+                <video id="video-camera" autoplay muted playsinline webkit-playsinline style="width: 100%; height: 400px; border-radius: 10px; background: #000; object-fit: cover;"></video>
+                <div id="status" class="status not-detected">🔴 Detectando marcador...</div>
+                <div class="button-group">
+                    <button id="btn-capture" class="btn-capture">Capturar Pez</button>
+                    <button id="btn-clear" class="btn-clear">Limpiar Acuario</button>
+                </div>
+            </div>
+
+            <div class="aquarium-section">
+                <h2>🐟 Mi Acuario</h2>
+                <canvas id="canvas-aquarium"></canvas>
+                <div class="fish-count">
+                    Peces capturados: <span id="fish-count">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== VARIABLES GLOBALES ====================
+        let cameraActive = false;
+        let markerDetected = false;
+        let stream = null;
+        let fishes = [];
+        let markerMinAR = null;
+        let started = false;
+
+        // ==================== ELEMENTOS DEL DOM ====================
+        const videoCameraEl = document.getElementById('video-camera');
+        const canvasAquariumEl = document.getElementById('canvas-aquarium');
+        const ctxAquarium = canvasAquariumEl.getContext('2d');
+        const statusEl = document.getElementById('status');
+        const btnCapture = document.getElementById('btn-capture');
+        const btnClear = document.getElementById('btn-clear');
+        const fishCountEl = document.getElementById('fish-count');
+
+        // ==================== INICIALIZACIÓN ====================
+        async function init() {
+            try {
+                console.log('=== INICIANDO APLICACIÓN ===');
+                statusEl.textContent = '⏳ Solicitando acceso a cámara...';
+
+                // Obtener cámara - lo más simple posible
+                try {
+                    console.log('Intentando obtener cámara...');
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        },
+                        audio: false
+                    });
+                    console.log('✓ Cámara trasera obtenida');
+                } catch (err) {
+                    console.log('Cámara trasera falló, intentando cualquier cámara:', err.message);
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    console.log('✓ Cámara genérica obtenida');
+                }
+
+                // Asignar stream
+                videoCameraEl.srcObject = stream;
+                cameraActive = true;
+                console.log('✓ Stream asignado a video element');
+
+                // Esperar brevemente a que esté listo
+                await new Promise(resolve => {
+                    let attempts = 0;
+                    const checkVideo = setInterval(() => {
+                        attempts++;
+                        console.log('Verificando video... intento', attempts);
+                        
+                        if (videoCameraEl.readyState >= 2 && videoCameraEl.videoWidth > 0) {
+                            clearInterval(checkVideo);
+                            console.log('✓ Video ready, resolución:', videoCameraEl.videoWidth, 'x', videoCameraEl.videoHeight);
+                            resolve();
+                        } else if (attempts > 50) {
+                            clearInterval(checkVideo);
+                            console.warn('⚠ Timeout esperando video, continuando de todas formas');
+                            resolve();
+                        }
+                    }, 100);
+                });
+
+                // Configurar acuario
+                console.log('Configurando acuario...');
+                setupAquarium();
+                console.log('✓ Acuario listo');
+
+                // Inicializar MindAR (opcional)
+                console.log('Intentando inicializar MindAR...');
+                initializeMindAR().then(() => {
+                    console.log('✓ MindAR inicializado');
+                }).catch(err => {
+                    console.warn('⚠ MindAR no disponible, funciona sin AR');
+                    // Permitir captura manual aunque no detecte marcador
+                    btnCapture.disabled = false;
+                    statusEl.textContent = '📸 Captura manual (sin AR)';
+                    statusEl.classList.remove('not-detected');
+                });
+
+                console.log('=== INICIALIZACIÓN COMPLETADA ===');
+                statusEl.textContent = '🔴 Detectando marcador...';
+
+            } catch (error) {
+                console.error('❌ ERROR FATAL:', error.name, error.message);
+                
+                let errorMsg = '❌ Error desconocido';
+                if (error.name === 'NotAllowedError') {
+                    errorMsg = '❌ Debes permitir acceso a la cámara';
+                } else if (error.name === 'NotFoundError') {
+                    errorMsg = '❌ Cámara no disponible';
+                } else if (error.name === 'NotReadableError') {
+                    errorMsg = '❌ Cámara en uso por otra app';
+                } else if (error.name === 'OverconstrainedError') {
+                    errorMsg = '❌ Tu cámara no cumple los requisitos';
+                } else if (error.message) {
+                    errorMsg = '❌ ' + error.message.substring(0, 50);
+                }
+                
+                statusEl.textContent = errorMsg;
+                statusEl.classList.remove('not-detected');
+                statusEl.classList.add('not-detected');
+                
+                console.error('Stack:', error.stack);
+            }
+        }
+
+        // ==================== MINDAR INITIALIZATION ====================
+        async function initializeMindAR() {
+            return new Promise((resolve, reject) => {
+                try {
+                    console.log('📡 Esperando a que MindAR esté disponible...');
+                    
+                    let attempts = 0;
+                    const checkMindar = setInterval(async () => {
+                        attempts++;
+                        if (window.MINDAR && window.MINDAR.IMAGE) {
+                            clearInterval(checkMindar);
+                            try {
+                                console.log('✓ MindAR cargado, inicializando...');
+
+                                // Crear estimador
+                                markerMinAR = new window.MINDAR.IMAGE.Estimator({});
+                                console.log('✓ Estimador creado');
+
+                                // Cargar archivo mind - PEZ2
+                                console.log('📂 Cargando PEZ2.mind...');
+                                const responsePEZ2 = await fetch('./PEZ2.mind');
+                                
+                                if (!responsePEZ2.ok) {
+                                    throw new Error(`HTTP ${responsePEZ2.status}`);
+                                }
+                                
+                                const bufferPEZ2 = await responsePEZ2.arrayBuffer();
+                                console.log('✓ PEZ2.mind cargado:', bufferPEZ2.byteLength, 'bytes');
+                                
+                                // Cargar archivo mind - Payaso
+                                console.log('📂 Cargando payaso.mind...');
+                                const responsePayaso = await fetch('./payaso.mind');
+                                
+                                if (!responsePayaso.ok) {
+                                    throw new Error(`HTTP ${responsePayaso.status}`);
+                                }
+                                
+                                const bufferPayaso = await responsePayaso.arrayBuffer();
+                                console.log('✓ payaso.mind cargado:', bufferPayaso.byteLength, 'bytes');
+                                
+                                // Cargar archivo mind - Pez3
+                                console.log('📂 Cargando pez3.mind...');
+                                const responsePez3 = await fetch('./pez3.mind');
+                                
+                                if (!responsePez3.ok) {
+                                    throw new Error(`HTTP ${responsePez3.status}`);
+                                }
+                                
+                                const bufferPez3 = await responsePez3.arrayBuffer();
+                                console.log('✓ pez3.mind cargado:', bufferPez3.byteLength, 'bytes');
+                                
+                                // Cargar archivo mind - Pez4
+                                console.log('📂 Cargando pez4.mind...');
+                                const responsePez4 = await fetch('./pez4.mind');
+                                
+                                if (!responsePez4.ok) {
+                                    throw new Error(`HTTP ${responsePez4.status}`);
+                                }
+                                
+                                const bufferPez4 = await responsePez4.arrayBuffer();
+                                console.log('✓ pez4.mind cargado:', bufferPez4.byteLength, 'bytes');
+                                
+                                // Añadir targets de todos los archivos
+                                await markerMinAR.addImageTargets(new Uint8Array(bufferPEZ2));
+                                console.log('✓ Targets de PEZ2.mind añadidos');
+                                
+                                await markerMinAR.addImageTargets(new Uint8Array(bufferPayaso));
+                                console.log('✓ Targets de payaso.mind añadidos');
+                                
+                                await markerMinAR.addImageTargets(new Uint8Array(bufferPez3));
+                                console.log('✓ Targets de pez3.mind añadidos');
+                                
+                                await markerMinAR.addImageTargets(new Uint8Array(bufferPez4));
+                                console.log('✓ Targets de pez4.mind añadidos');
+                                
+                                // Iniciar
+                                await markerMinAR.start();
+                                console.log('✓ Estimador iniciado, monitoreando...');
+                                
+                                // Monitoreo
+                                monitorMarkerDetection();
+                                
+                                resolve();
+                            } catch (error) {
+                                console.error('❌ Error inicializando MindAR:', error.message);
+                                reject(error);
+                            }
+                        } else if (attempts > 200) {
+                            clearInterval(checkMindar);
+                            console.warn('⚠ MindAR no disponible');
+                            reject(new Error('MindAR timeout'));
+                        }
+                    }, 50);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        // ==================== MONITOREAR DETECCIÓN ====================
+        function monitorMarkerDetection() {
+            console.log('🔍 Iniciando detección continua de marcador');
+            let lastDetected = false;
+            let errorCount = 0;
+
+            const detectLoop = setInterval(async () => {
+                if (!cameraActive || !markerMinAR) {
+                    return;
+                }
+
+                try {
+                    // Llamar estimate con el elemento video
+                    const estimates = await markerMinAR.estimate(videoCameraEl);
+                    const isDetected = estimates && estimates.length > 0;
+
+                    if (isDetected && !lastDetected) {
+                        console.log('🎯 ¡MARCADOR DETECTADO!', estimates);
+                        markerDetected = true;
+                        statusEl.textContent = '🟢 ¡Marcador detectado!';
+                        statusEl.classList.remove('not-detected');
+                        statusEl.classList.add('detected');
+                        btnCapture.disabled = false;
+                        lastDetected = true;
+                        errorCount = 0;
+                    } else if (!isDetected && lastDetected) {
+                        console.log('❌ Marcador perdido');
+                        markerDetected = false;
+                        statusEl.textContent = '🔴 Detectando marcador...';
+                        statusEl.classList.remove('detected');
+                        statusEl.classList.add('not-detected');
+                        btnCapture.disabled = true;
+                        lastDetected = false;
+                    }
+                } catch (e) {
+                    errorCount++;
+                    if (errorCount === 1) {
+                        console.warn('⚠ Error en estimate():', e.message);
+                    }
+                    if (errorCount > 50) {
+                        console.error('❌ Demasiados errores, deteniendo detección');
+                        clearInterval(detectLoop);
+                    }
+                }
+            }, 100);
+        }
+
+
+        // ==================== CAPTURAR Y PROCESAR IMAGEN ====================
+        function captureAndProcessImage() {
+            if (!cameraActive) {
+                alert('La cámara no está activa');
+                return;
+            }
+
+            try {
+                console.log('📸 Capturando pez...');
+                
+                // Crear canvas temporal para captura
+                const captureCanvas = document.createElement('canvas');
+                captureCanvas.width = videoCameraEl.videoWidth;
+                captureCanvas.height = videoCameraEl.videoHeight;
+                const captureCtx = captureCanvas.getContext('2d');
+
+                // Dibujar el frame actual del video
+                captureCtx.drawImage(videoCameraEl, 0, 0, captureCanvas.width, captureCanvas.height);
+                console.log('✓ Frame capturado:', captureCanvas.width, 'x', captureCanvas.height);
+
+                // Obtener datos de la imagen
+                const imageData = captureCtx.getImageData(0, 0, captureCanvas.width, captureCanvas.height);
+                const data = imageData.data;
+
+                // Remover fondo blanco usando umbral RGB
+                const whiteThreshold = 200;
+                let pixelesTransparentes = 0;
+                
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+
+                    // Si el píxel es blanco o muy claro, hacerlo transparente
+                    if (r > whiteThreshold && g > whiteThreshold && b > whiteThreshold) {
+                        data[i + 3] = 0; // Hacer transparente
+                        pixelesTransparentes++;
+                    }
+                }
+
+                console.log('✓ Fondo removido:', pixelesTransparentes, 'píxeles transparentes');
+                captureCtx.putImageData(imageData, 0, 0);
+
+                // Guardar como pez
+                const fishImageData = captureCtx.getImageData(0, 0, captureCanvas.width, captureCanvas.height);
+                addFishToAquarium(fishImageData);
+                
+                statusEl.textContent = '✅ ¡Pez capturado!';
+                setTimeout(() => {
+                    if (markerDetected) {
+                        statusEl.textContent = '🟢 ¡Marcador detectado!';
+                    } else {
+                        statusEl.textContent = '📸 Captura manual (sin AR)';
+                    }
+                }, 1500);
+
+            } catch (error) {
+                console.error('Error al capturar:', error);
+                alert('Error al capturar la imagen: ' + error.message);
+            }
+        }
+
+        // ==================== AÑADIR PEZ AL ACUARIO ====================
+        function addFishToAquarium(imageData) {
+            const fish = {
+                imageData: imageData,
+                x: Math.random() * (canvasAquariumEl.width - 80),
+                y: Math.random() * (canvasAquariumEl.height * 0.5) + canvasAquariumEl.height * 0.25,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 2,
+                scale: 0.15 + Math.random() * 0.1,
+                rotation: Math.random() * Math.PI * 2,
+                id: fishes.length
+            };
+
+            fishes.push(fish);
+            fishCountEl.textContent = fishes.length;
+        }
+
+        // ==================== CONFIGURAR ACUARIO ====================
+        function setupAquarium() {
+            canvasAquariumEl.width = canvasAquariumEl.clientWidth;
+            canvasAquariumEl.height = canvasAquariumEl.clientHeight;
+            animateAquarium();
+        }
+
+        // ==================== ANIMAR ACUARIO ====================
+        let waveOffset = 0;
+        let time = 0;
+
+        function animateAquarium() {
+            ctxAquarium.clearRect(0, 0, canvasAquariumEl.width, canvasAquariumEl.height);
+
+            // Gradiente de agua
+            const gradient = ctxAquarium.createLinearGradient(0, 0, 0, canvasAquariumEl.height);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(0.5, '#4A90E2');
+            gradient.addColorStop(1, '#2E5C8A');
+            ctxAquarium.fillStyle = gradient;
+            ctxAquarium.fillRect(0, 0, canvasAquariumEl.width, canvasAquariumEl.height);
+
+            // Arena en el fondo
+            drawSand();
+
+            // Plantas acuáticas
+            drawWaterPlants();
+
+            // Rayos de luz
+            drawLightRays();
+
+            // Burbujas
+            drawBubbles();
+
+            // Actualizar y dibujar peces
+            updateAndDrawFishes();
+
+            // Ondas en la superficie
+            drawWaveSurface();
+
+            time += 0.03;
+            requestAnimationFrame(animateAquarium);
+        }
+
+        // ==================== DIBUJAR ARENA ====================
+        function drawSand() {
+            ctxAquarium.fillStyle = 'rgba(210, 180, 140, 0.8)';
+            ctxAquarium.fillRect(0, canvasAquariumEl.height - 40, canvasAquariumEl.width, 40);
+
+            // Granitos de arena
+            ctxAquarium.fillStyle = 'rgba(180, 140, 100, 0.4)';
+            for (let i = 0; i < 50; i++) {
+                const x = Math.random() * canvasAquariumEl.width;
+                const y = canvasAquariumEl.height - Math.random() * 30 - 5;
+                const size = Math.random() * 3;
+                ctxAquarium.fillRect(x, y, size, size);
+            }
+        }
+
+        // ==================== DIBUJAR PLANTAS ACUÁTICAS ====================
+        function drawWaterPlants() {
+            ctxAquarium.strokeStyle = 'rgba(34, 139, 34, 0.6)';
+            ctxAquarium.lineWidth = 3;
+
+            const plantPositions = [50, 200, 350, canvasAquariumEl.width - 100];
+            plantPositions.forEach((x, i) => {
+                drawPlant(x, canvasAquariumEl.height, i);
+            });
+        }
+
+        function drawPlant(x, y, index) {
+            const wave = Math.sin(time * 2 + index) * 15;
+            ctxAquarium.beginPath();
+            ctxAquarium.moveTo(x, y);
+
+            for (let i = 0; i < 5; i++) {
+                const px = x + Math.sin(time * 2 + index + i * 0.5) * 20;
+                const py = y - i * 30;
+                ctxAquarium.lineTo(px, py);
+            }
+            ctxAquarium.stroke();
+        }
+
+        // ==================== DIBUJAR RAYOS DE LUZ ====================
+        function drawLightRays() {
+            ctxAquarium.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctxAquarium.lineWidth = 15;
+
+            for (let i = 0; i < 3; i++) {
+                const x = (i * canvasAquariumEl.width + time * 100) % canvasAquariumEl.width;
+                ctxAquarium.beginPath();
+                ctxAquarium.moveTo(x, 0);
+                ctxAquarium.lineTo(x + 30, canvasAquariumEl.height);
+                ctxAquarium.stroke();
+            }
+        }
+
+        // ==================== DIBUJAR BURBUJAS ====================
+        const bubbles = [];
+        function drawBubbles() {
+            // Crear burbujas ocasionalmente
+            if (Math.random() < 0.03) {
+                bubbles.push({
+                    x: Math.random() * canvasAquariumEl.width,
+                    y: canvasAquariumEl.height,
+                    radius: Math.random() * 5 + 2,
+                    vy: -Math.random() * 1 - 0.5,
+                    vx: (Math.random() - 0.5) * 0.5
+                });
+            }
+
+            // Actualizar y dibujar burbujas
+            for (let i = bubbles.length - 1; i >= 0; i--) {
+                const bubble = bubbles[i];
+                bubble.x += bubble.vx;
+                bubble.y += bubble.vy;
+
+                ctxAquarium.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctxAquarium.beginPath();
+                ctxAquarium.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2);
+                ctxAquarium.fill();
+                ctxAquarium.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctxAquarium.lineWidth = 1;
+                ctxAquarium.stroke();
+
+                if (bubble.y < 0) {
+                    bubbles.splice(i, 1);
+                }
+            }
+        }
+
+        // ==================== ACTUALIZAR Y DIBUJAR PECES ====================
+        function updateAndDrawFishes() {
+            fishes.forEach(fish => {
+                // Actualizar posición
+                fish.x += fish.vx;
+                fish.y += fish.vy;
+
+                // Rebotar en los límites
+                if (fish.x < 0 || fish.x > canvasAquariumEl.width) fish.vx *= -1;
+                if (fish.y < 0 || fish.y > canvasAquariumEl.height - 50) fish.vy *= -1;
+
+                // Movimiento ondulante
+                fish.vy += Math.sin(time + fish.id) * 0.02;
+                if (fish.vx > 0) fish.rotation = 0;
+                else fish.rotation = Math.PI;
+
+                // Dibujar pez
+                drawScaledFish(fish);
+            });
+        }
+
+        function drawScaledFish(fish) {
+            ctxAquarium.save();
+            ctxAquarium.translate(fish.x, fish.y);
+            ctxAquarium.rotate(fish.rotation);
+            ctxAquarium.scale(fish.scale, fish.scale);
+            ctxAquarium.globalAlpha = 0.8;
+
+            // Crear un canvas temporal para la imagen del pez
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = fish.imageData.width;
+            tempCanvas.height = fish.imageData.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.putImageData(fish.imageData, 0, 0);
+
+            // Dibujar la imagen del pez escalada
+            ctxAquarium.drawImage(
+                tempCanvas,
+                -tempCanvas.width / 2,
+                -tempCanvas.height / 2,
+                tempCanvas.width,
+                tempCanvas.height
+            );
+
+            ctxAquarium.restore();
+        }
+
+        // ==================== DIBUJAR ONDAS EN LA SUPERFICIE ====================
+        function drawWaveSurface() {
+            ctxAquarium.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctxAquarium.lineWidth = 2;
+            ctxAquarium.beginPath();
+
+            for (let x = 0; x <= canvasAquariumEl.width; x += 10) {
+                const y = 20 + Math.sin(x * 0.01 + time * 3) * 8;
+                if (x === 0) ctxAquarium.moveTo(x, y);
+                else ctxAquarium.lineTo(x, y);
+            }
+
+            ctxAquarium.stroke();
+        }
+
+        // ==================== EVENT LISTENERS ====================
+        btnCapture.addEventListener('click', captureAndProcessImage);
+        btnClear.addEventListener('click', () => {
+            fishes = [];
+            fishCountEl.textContent = '0';
+        });
+
+        // Manejar redimensionamiento
+        window.addEventListener('resize', () => {
+            setupAquarium();
+        });
+
+        // ==================== INICIAR CUANDO ESTÉ LISTO ====================
+        function startApp() {
+            console.log('Página lista, iniciando aplicación...');
+            if (!cameraActive) {
+                init().catch(err => console.error('Error en init():', err));
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', startApp);
+        } else {
+            startApp();
+        }
+
+        // Limpiar al cerrar
+        window.addEventListener('beforeunload', () => {
+            console.log('Cerrando aplicación...');
+            if (stream) {
+                stream.getTracks().forEach(track => {
+                    track.stop();
+                    console.log('Track detenido');
+                });
+            }
+            if (markerMinAR) {
+                markerMinAR.stop().catch(e => console.log('Error deteniendo MindAR:', e));
+            }
+        });
+    </script>
+</body>
+</html>
