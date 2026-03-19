@@ -165,33 +165,6 @@
             display: block;
         }
 
-        #canvas-aquarium.hidden {
-            display: none;
-        }
-
-        .triple-projection-container {
-            display: none;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 0;
-            height: 400px;
-            border-radius: 10px;
-            overflow: hidden;
-            border: 3px solid #667eea;
-        }
-
-        .triple-projection-container.active {
-            display: grid;
-        }
-
-        .triple-projection-container canvas {
-            background: linear-gradient(to bottom, #87CEEB 0%, #4A90E2 50%, #2E5C8A 100%);
-            border-right: 2px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .triple-projection-container canvas:last-child {
-            border-right: none;
-        }
-
         .fish-count {
             padding: 10px;
             background: #f5f5f5;
@@ -199,28 +172,6 @@
             text-align: center;
             font-weight: bold;
             color: #333;
-        }
-
-        .projection-control {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .projection-control label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: bold;
-            color: #333;
-            cursor: pointer;
-        }
-
-        .projection-control input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
         }
 
         .instructions {
@@ -255,17 +206,17 @@
     <div class="container">
         <div class="header">
             <h1>🐠 Acuario AR 🐠</h1>
-            <p>Detecta cualquier marcador, captura peces y acumúlalos en el acuario</p>
+            <p>Detecta marcadores, captura peces con procesamiento inteligente y acumúlalos en el acuario</p>
         </div>
 
         <div class="instructions">
             <h3>📋 Instrucciones:</h3>
             <ol>
                 <li>Asegúrate de que tu cámara esté habilitada</li>
-                <li>Apunta a uno de los marcadores (PEZ2.mind, payaso.mind, pez3.mind o pez4.mind)</li>
+                <li>Apunta a uno de los marcadores (Máscara de recorte o Siluetapez)</li>
                 <li>Cuando aparezca el botón verde, captura la imagen</li>
-                <li>El fondo blanco se eliminará automáticamente</li>
-                <li>Los peces aparecerán nadando en el acuario</li>
+                <li>El sistema analiza automáticamente la imagen con máscara de recorte</li>
+                <li>Los peces aparecerán nadando en el acuario con transparencia</li>
                 <li>¡Captura múltiples veces para llenar el acuario!</li>
             </ol>
         </div>
@@ -283,20 +234,9 @@
 
             <div class="aquarium-section">
                 <h2>🐟 Mi Acuario</h2>
-                <div class="projection-control">
-                    <label>
-                        <input type="checkbox" id="triple-projection-toggle">
-                        📺 3 Proyecciones
-                    </label>
-                </div>
                 <canvas id="canvas-aquarium"></canvas>
-                <div class="triple-projection-container" id="triple-projection-container">
-                    <canvas id="canvas-projection-1"></canvas>
-                    <canvas id="canvas-projection-2"></canvas>
-                    <canvas id="canvas-projection-3"></canvas>
-                </div>
                 <div class="fish-count">
-                    Peces capturados: <span id="fish-count">0</span>
+                    peces en el acuario: <span id="fish-count">0</span>
                 </div>
             </div>
         </div>
@@ -310,9 +250,7 @@
         let fishes = [];
         let markerMinAR = null;
         let started = false;
-        let tripleProjectionActive = false;
-        let projectionCanvases = [];
-        let projectionContexts = [];
+        let time = 0;
 
         // ==================== ELEMENTOS DEL DOM ====================
         const videoCameraEl = document.getElementById('video-camera');
@@ -322,8 +260,6 @@
         const btnCapture = document.getElementById('btn-capture');
         const btnClear = document.getElementById('btn-clear');
         const fishCountEl = document.getElementById('fish-count');
-        const tripleProjectionToggle = document.getElementById('triple-projection-toggle');
-        const tripleProjectionContainer = document.getElementById('triple-projection-container');
 
         // ==================== INICIALIZACIÓN ====================
         async function init() {
@@ -331,7 +267,7 @@
                 console.log('=== INICIANDO APLICACIÓN ===');
                 statusEl.textContent = '⏳ Solicitando acceso a cámara...';
 
-                // Obtener cámara - lo más simple posible
+                // Obtener cámara
                 try {
                     console.log('Intentando obtener cámara...');
                     stream = await navigator.mediaDevices.getUserMedia({ 
@@ -349,25 +285,22 @@
                     console.log('✓ Cámara genérica obtenida');
                 }
 
-                // Asignar stream
                 videoCameraEl.srcObject = stream;
                 cameraActive = true;
                 console.log('✓ Stream asignado a video element');
 
-                // Esperar brevemente a que esté listo
+                // Esperar a que video esté listo
                 await new Promise(resolve => {
                     let attempts = 0;
                     const checkVideo = setInterval(() => {
                         attempts++;
-                        console.log('Verificando video... intento', attempts);
-                        
                         if (videoCameraEl.readyState >= 2 && videoCameraEl.videoWidth > 0) {
                             clearInterval(checkVideo);
-                            console.log('✓ Video ready, resolución:', videoCameraEl.videoWidth, 'x', videoCameraEl.videoHeight);
+                            console.log('✓ Video ready');
                             resolve();
                         } else if (attempts > 50) {
                             clearInterval(checkVideo);
-                            console.warn('⚠ Timeout esperando video, continuando de todas formas');
+                            console.warn('⚠ Timeout esperando video');
                             resolve();
                         }
                     }, 100);
@@ -378,13 +311,12 @@
                 setupAquarium();
                 console.log('✓ Acuario listo');
 
-                // Inicializar MindAR (opcional)
+                // Inicializar MindAR
                 console.log('Intentando inicializar MindAR...');
                 initializeMindAR().then(() => {
                     console.log('✓ MindAR inicializado');
                 }).catch(err => {
-                    console.warn('⚠ MindAR no disponible, funciona sin AR');
-                    // Permitir captura manual aunque no detecte marcador
+                    console.warn('⚠ MindAR no disponible');
                     btnCapture.disabled = false;
                     statusEl.textContent = '📸 Captura manual (sin AR)';
                     statusEl.classList.remove('not-detected');
@@ -394,123 +326,46 @@
                 statusEl.textContent = '🔴 Detectando marcador...';
 
             } catch (error) {
-                console.error('❌ ERROR FATAL:', error.name, error.message);
-                
+                console.error('❌ ERROR:', error.message);
                 let errorMsg = '❌ Error desconocido';
                 if (error.name === 'NotAllowedError') {
                     errorMsg = '❌ Debes permitir acceso a la cámara';
                 } else if (error.name === 'NotFoundError') {
                     errorMsg = '❌ Cámara no disponible';
-                } else if (error.name === 'NotReadableError') {
-                    errorMsg = '❌ Cámara en uso por otra app';
-                } else if (error.name === 'OverconstrainedError') {
-                    errorMsg = '❌ Tu cámara no cumple los requisitos';
-                } else if (error.message) {
-                    errorMsg = '❌ ' + error.message.substring(0, 50);
                 }
-                
                 statusEl.textContent = errorMsg;
-                statusEl.classList.remove('not-detected');
-                statusEl.classList.add('not-detected');
-                
-                console.error('Stack:', error.stack);
             }
         }
 
-        // ==================== MINDAR INITIALIZATION ====================
-        async function initializeMindAR() {
-            return new Promise((resolve, reject) => {
+        // ==================== INICIALIZAR MINDAR ====================
+        function initializeMindAR() {
+            return new Promise(async (resolve, reject) => {
                 try {
-                    console.log('📡 Esperando a que MindAR esté disponible...');
-                    
-                    let attempts = 0;
-                    const checkMindar = setInterval(async () => {
-                        attempts++;
-                        if (window.MINDAR && window.MINDAR.IMAGE) {
-                            clearInterval(checkMindar);
-                            try {
-                                console.log('✓ MindAR cargado, inicializando...');
+                    if (!window.MINDAR) {
+                        throw new Error('MindAR no cargado');
+                    }
 
-                                // Crear estimador
-                                markerMinAR = new window.MINDAR.IMAGE.Estimator({});
-                                console.log('✓ Estimador creado');
+                    // Cargar archivos mind
+                    console.log('📂 Cargando archivos mind...');
+                    const responseMascara = await fetch('./Mascara de recorte.mind');
+                    const bufferMascara = await responseMascara.arrayBuffer();
+                    console.log('✓ Mascara de recorte.mind cargado');
 
-                                // Cargar archivo mind - PEZ2
-                                console.log('📂 Cargando PEZ2.mind...');
-                                const responsePEZ2 = await fetch('./PEZ2.mind');
-                                
-                                if (!responsePEZ2.ok) {
-                                    throw new Error(`HTTP ${responsePEZ2.status}`);
-                                }
-                                
-                                const bufferPEZ2 = await responsePEZ2.arrayBuffer();
-                                console.log('✓ PEZ2.mind cargado:', bufferPEZ2.byteLength, 'bytes');
-                                
-                                // Cargar archivo mind - Payaso
-                                console.log('📂 Cargando payaso.mind...');
-                                const responsePayaso = await fetch('./payaso.mind');
-                                
-                                if (!responsePayaso.ok) {
-                                    throw new Error(`HTTP ${responsePayaso.status}`);
-                                }
-                                
-                                const bufferPayaso = await responsePayaso.arrayBuffer();
-                                console.log('✓ payaso.mind cargado:', bufferPayaso.byteLength, 'bytes');
-                                
-                                // Cargar archivo mind - Pez3
-                                console.log('📂 Cargando pez3.mind...');
-                                const responsePez3 = await fetch('./pez3.mind');
-                                
-                                if (!responsePez3.ok) {
-                                    throw new Error(`HTTP ${responsePez3.status}`);
-                                }
-                                
-                                const bufferPez3 = await responsePez3.arrayBuffer();
-                                console.log('✓ pez3.mind cargado:', bufferPez3.byteLength, 'bytes');
-                                
-                                // Cargar archivo mind - Pez4
-                                console.log('📂 Cargando pez4.mind...');
-                                const responsePez4 = await fetch('./pez4.mind');
-                                
-                                if (!responsePez4.ok) {
-                                    throw new Error(`HTTP ${responsePez4.status}`);
-                                }
-                                
-                                const bufferPez4 = await responsePez4.arrayBuffer();
-                                console.log('✓ pez4.mind cargado:', bufferPez4.byteLength, 'bytes');
-                                
-                                // Añadir targets de todos los archivos
-                                await markerMinAR.addImageTargets(new Uint8Array(bufferPEZ2));
-                                console.log('✓ Targets de PEZ2.mind añadidos');
-                                
-                                await markerMinAR.addImageTargets(new Uint8Array(bufferPayaso));
-                                console.log('✓ Targets de payaso.mind añadidos');
-                                
-                                await markerMinAR.addImageTargets(new Uint8Array(bufferPez3));
-                                console.log('✓ Targets de pez3.mind añadidos');
-                                
-                                await markerMinAR.addImageTargets(new Uint8Array(bufferPez4));
-                                console.log('✓ Targets de pez4.mind añadidos');
-                                
-                                // Iniciar
-                                await markerMinAR.start();
-                                console.log('✓ Estimador iniciado, monitoreando...');
-                                
-                                // Monitoreo
-                                monitorMarkerDetection();
-                                
-                                resolve();
-                            } catch (error) {
-                                console.error('❌ Error inicializando MindAR:', error.message);
-                                reject(error);
-                            }
-                        } else if (attempts > 200) {
-                            clearInterval(checkMindar);
-                            console.warn('⚠ MindAR no disponible');
-                            reject(new Error('MindAR timeout'));
-                        }
-                    }, 50);
+                    const responseSilueta = await fetch('./Siluetapez.mind');
+                    const bufferSilueta = await responseSilueta.arrayBuffer();
+                    console.log('✓ Siluetapez.mind cargado');
+
+                    // Inicializar MindAR
+                    markerMinAR = new window.MINDAR.IMAGE.Anchor({
+                        buffers: [bufferMascara, bufferSilueta]
+                    });
+
+                    console.log('✓ MindAR inicializado correctamente con 2 marcadores');
+                    monitorMarkerDetection();
+                    resolve();
+
                 } catch (error) {
+                    console.error('❌ Error en MindAR:', error.message);
                     reject(error);
                 }
             });
@@ -518,29 +373,24 @@
 
         // ==================== MONITOREAR DETECCIÓN ====================
         function monitorMarkerDetection() {
-            console.log('🔍 Iniciando detección continua de marcador');
+            console.log('🔍 Monitoreando marcadores');
             let lastDetected = false;
-            let errorCount = 0;
 
             const detectLoop = setInterval(async () => {
-                if (!cameraActive || !markerMinAR) {
-                    return;
-                }
+                if (!cameraActive || !markerMinAR) return;
 
                 try {
-                    // Llamar estimate con el elemento video
                     const estimates = await markerMinAR.estimate(videoCameraEl);
                     const isDetected = estimates && estimates.length > 0;
 
                     if (isDetected && !lastDetected) {
-                        console.log('🎯 ¡MARCADOR DETECTADO!', estimates);
+                        console.log('🎯 ¡MARCADOR DETECTADO!');
                         markerDetected = true;
                         statusEl.textContent = '🟢 ¡Marcador detectado!';
                         statusEl.classList.remove('not-detected');
                         statusEl.classList.add('detected');
                         btnCapture.disabled = false;
                         lastDetected = true;
-                        errorCount = 0;
                     } else if (!isDetected && lastDetected) {
                         console.log('❌ Marcador perdido');
                         markerDetected = false;
@@ -551,14 +401,7 @@
                         lastDetected = false;
                     }
                 } catch (e) {
-                    errorCount++;
-                    if (errorCount === 1) {
-                        console.warn('⚠ Error en estimate():', e.message);
-                    }
-                    if (errorCount > 50) {
-                        console.error('❌ Demasiados errores, deteniendo detección');
-                        clearInterval(detectLoop);
-                    }
+                    // Error ignorable
                 }
             }, 100);
         }
@@ -571,160 +414,134 @@
             }
 
             try {
-                console.log('📸 Capturando pez...');
+                console.log('📸 Capturando pez con procesamiento avanzado...');
                 
-                // Crear canvas temporal para captura
+                // PASO 1: Capturar frame del video
                 const captureCanvas = document.createElement('canvas');
                 captureCanvas.width = videoCameraEl.videoWidth;
                 captureCanvas.height = videoCameraEl.videoHeight;
                 const captureCtx = captureCanvas.getContext('2d');
 
-                // Dibujar el frame actual del video
                 captureCtx.drawImage(videoCameraEl, 0, 0, captureCanvas.width, captureCanvas.height);
                 console.log('✓ Frame capturado:', captureCanvas.width, 'x', captureCanvas.height);
 
-                // Obtener datos de la imagen
+                // PASO 2: Obtener datos de imagen
                 const imageData = captureCtx.getImageData(0, 0, captureCanvas.width, captureCanvas.height);
                 const data = imageData.data;
 
-                // Remover fondo blanco usando umbral RGB
-                const whiteThreshold = 200;
-                let pixelesTransparentes = 0;
+                // PASO 3: Convertir a escala de grises y crear máscara
+                console.log('🔍 Analizando imagen...');
+                const grayData = new Uint8ClampedArray(captureCanvas.width * captureCanvas.height);
                 
                 for (let i = 0; i < data.length; i += 4) {
                     const r = data[i];
                     const g = data[i + 1];
                     const b = data[i + 2];
+                    
+                    // Fórmula de conversión a escala de grises
+                    const gray = (0.299 * r + 0.587 * g + 0.114 * b);
+                    const pixelIndex = i / 4;
+                    grayData[pixelIndex] = gray;
+                }
 
-                    // Si el píxel es blanco o muy claro, hacerlo transparente
-                    if (r > whiteThreshold && g > whiteThreshold && b > whiteThreshold) {
-                        data[i + 3] = 0; // Hacer transparente
-                        pixelesTransparentes++;
+                // PASO 4: Aplicar threshold (umbral)
+                const threshold = 180; // Detecta áreas oscuras (negro/pez)
+                console.log('📊 Aplicando threshold:', threshold);
+                const binaryMask = new Uint8ClampedArray(captureCanvas.width * captureCanvas.height);
+                
+                for (let i = 0; i < grayData.length; i++) {
+                    // Negro (oscuro) = 255 (válido), Blanco = 0 (eliminar)
+                    binaryMask[i] = grayData[i] < threshold ? 255 : 0;
+                }
+
+                // PASO 5: Crear máscara binaria y aplicar clipping
+                console.log('🎨 Creando máscara de recorte...');
+                const maskImageData = new ImageData(
+                    new Uint8ClampedArray(captureCanvas.width * captureCanvas.height * 4),
+                    captureCanvas.width,
+                    captureCanvas.height
+                );
+
+                for (let i = 0; i < binaryMask.length; i++) {
+                    const pixelPos = i * 4;
+                    const origPixelPos = i * 4;
+                    
+                    if (binaryMask[i] > 128) {
+                        // Área válida: mantener píxel original
+                        maskImageData.data[pixelPos] = data[origPixelPos];        // R
+                        maskImageData.data[pixelPos + 1] = data[origPixelPos + 1]; // G
+                        maskImageData.data[pixelPos + 2] = data[origPixelPos + 2]; // B
+                        maskImageData.data[pixelPos + 3] = 255; // A (opaco)
+                    } else {
+                        // Área de fondo: transparente
+                        maskImageData.data[pixelPos + 3] = 0; // A (transparente)
                     }
                 }
 
-                console.log('✓ Fondo removido:', pixelesTransparentes, 'píxeles transparentes');
-                captureCtx.putImageData(imageData, 0, 0);
+                // PASO 6: Dibujar máscara en canvas
+                const maskCanvas = document.createElement('canvas');
+                maskCanvas.width = captureCanvas.width;
+                maskCanvas.height = captureCanvas.height;
+                const maskCtx = maskCanvas.getContext('2d');
+                maskCtx.putImageData(maskImageData, 0, 0);
 
-                // Guardar como pez
-                const fishImageData = captureCtx.getImageData(0, 0, captureCanvas.width, captureCanvas.height);
-                addFishToAquarium(fishImageData);
+                console.log('✓ Máscara aplicada');
+
+                // PASO 7: Crear canvas final escalado para el acuario
+                const finalCanvas = document.createElement('canvas');
+                finalCanvas.width = 200;
+                finalCanvas.height = 200;
+                const finalCtx = finalCanvas.getContext('2d');
+
+                // Dibujar imagen enmascarada escalada
+                const scale = Math.max(finalCanvas.width / maskCanvas.width, finalCanvas.height / maskCanvas.height);
+                const x = (finalCanvas.width - maskCanvas.width * scale) / 2;
+                const y = (finalCanvas.height - maskCanvas.height * scale) / 2;
                 
-                statusEl.textContent = '✅ ¡Pez capturado!';
-                setTimeout(() => {
-                    if (markerDetected) {
-                        statusEl.textContent = '🟢 ¡Marcador detectado!';
-                    } else {
-                        statusEl.textContent = '📸 Captura manual (sin AR)';
-                    }
-                }, 1500);
+                finalCtx.drawImage(maskCanvas, x, y, maskCanvas.width * scale, maskCanvas.height * scale);
+
+                // Añadir al acuario
+                addFishToAquarium(finalCanvas);
+                console.log('✓ Pez procesado y añadido al acuario');
 
             } catch (error) {
-                console.error('Error al capturar:', error);
-                alert('Error al capturar la imagen: ' + error.message);
+                console.error('❌ Error en captura:', error.message);
+                alert('Error al capturar: ' + error.message);
             }
         }
 
         // ==================== AÑADIR PEZ AL ACUARIO ====================
-        function addFishToAquarium(imageData) {
+        function addFishToAquarium(canvas) {
             const fish = {
-                imageData: imageData,
+                canvas: canvas,
                 x: Math.random() * (canvasAquariumEl.width - 80),
                 y: Math.random() * (canvasAquariumEl.height * 0.5) + canvasAquariumEl.height * 0.25,
                 vx: (Math.random() - 0.5) * 4,
                 vy: (Math.random() - 0.5) * 2,
-                scale: 0.15 + Math.random() * 0.1,
-                rotation: Math.random() * Math.PI * 2,
-                id: fishes.length
+                scale: 0.4 + Math.random() * 0.2,
+                rotation: Math.random() * Math.PI * 2
             };
 
             fishes.push(fish);
             fishCountEl.textContent = fishes.length;
+            console.log('🐠 Pez #' + fishes.length + ' capturado, escala:', fish.scale.toFixed(2));
         }
 
         // ==================== CONFIGURAR ACUARIO ====================
         function setupAquarium() {
             canvasAquariumEl.width = canvasAquariumEl.clientWidth;
             canvasAquariumEl.height = canvasAquariumEl.clientHeight;
-            
-            // Configurar canvas de proyecciones si están activas
-            if (tripleProjectionActive) {
-                projectionCanvases = [
-                    document.getElementById('canvas-projection-1'),
-                    document.getElementById('canvas-projection-2'),
-                    document.getElementById('canvas-projection-3')
-                ];
-                projectionContexts = projectionCanvases.map(canvas => {
-                    canvas.width = canvas.clientWidth;
-                    canvas.height = canvas.clientHeight;
-                    return canvas.getContext('2d');
-                });
-            }
-            
-            animateAquarium();
+            console.log('Canvas size:', canvasAquariumEl.width, 'x', canvasAquariumEl.height);
         }
 
-        // ==================== ANIMAR ACUARIO ====================
-        let waveOffset = 0;
-        let time = 0;
-
-        function animateAquarium() {
-            drawAquariumScene(ctxAquarium, canvasAquariumEl);
-            
-            // Si está activa la proyección triple, dibujar en los 3 canvas
-            if (tripleProjectionActive && projectionContexts.length === 3) {
-                for (let i = 0; i < 3; i++) {
-                    drawAquariumScene(projectionContexts[i], projectionCanvases[i]);
-                }
-            }
-
-            time += 0.03;
-            requestAnimationFrame(animateAquarium);
-        }
-
-        function drawAquariumScene(ctx, canvas) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Gradiente de agua
+        // ==================== DIBUJAR FONDO ====================
+        function drawBackground(ctx, canvas) {
             const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
             gradient.addColorStop(0, '#87CEEB');
             gradient.addColorStop(0.5, '#4A90E2');
             gradient.addColorStop(1, '#2E5C8A');
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Arena en el fondo
-            drawSand(ctx, canvas);
-
-            // Plantas acuáticas
-            drawWaterPlants(ctx, canvas);
-
-            // Rayos de luz
-            drawLightRays(ctx, canvas);
-
-            // Burbujas
-            drawBubbles(ctx, canvas);
-
-            // Actualizar y dibujar peces
-            updateAndDrawFishes(ctx, canvas);
-
-            // Ondas en la superficie
-            drawWaveSurface(ctx, canvas);
-        }
-
-        // ==================== DIBUJAR ARENA ====================
-        function drawSand(ctx, canvas) {
-            ctx.fillStyle = 'rgba(210, 180, 140, 0.8)';
-            ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
-
-            // Granitos de arena
-            ctx.fillStyle = 'rgba(180, 140, 100, 0.4)';
-            for (let i = 0; i < 50; i++) {
-                const x = Math.random() * canvas.width;
-                const y = canvas.height - Math.random() * 30 - 5;
-                const size = Math.random() * 3;
-                ctx.fillRect(x, y, size, size);
-            }
         }
 
         // ==================== DIBUJAR PLANTAS ACUÁTICAS ====================
@@ -739,7 +556,6 @@
         }
 
         function drawPlant(x, y, index, ctx) {
-            const wave = Math.sin(time * 2 + index) * 15;
             ctx.beginPath();
             ctx.moveTo(x, y);
 
@@ -768,7 +584,6 @@
         // ==================== DIBUJAR BURBUJAS ====================
         const bubbles = [];
         function drawBubbles(ctx, canvas) {
-            // Crear burbujas ocasionalmente
             if (Math.random() < 0.03) {
                 bubbles.push({
                     x: Math.random() * canvas.width,
@@ -779,7 +594,6 @@
                 });
             }
 
-            // Actualizar y dibujar burbujas
             for (let i = bubbles.length - 1; i >= 0; i--) {
                 const bubble = bubbles[i];
                 bubble.x += bubble.vx;
@@ -807,105 +621,130 @@
                 fish.y += fish.vy;
 
                 // Rebotar en los límites
-                if (fish.x < 0 || fish.x > canvas.width) fish.vx *= -1;
-                if (fish.y < 0 || fish.y > canvas.height - 50) fish.vy *= -1;
+                if (fish.x < 0 || fish.x > canvas.width) {
+                    fish.vx *= -1;
+                }
+                if (fish.y < 0 || fish.y > canvas.height) {
+                    fish.vy *= -1;
+                }
 
-                // Movimiento ondulante
-                fish.vy += Math.sin(time + fish.id) * 0.02;
-                if (fish.vx > 0) fish.rotation = 0;
-                else fish.rotation = Math.PI;
+                // Actualizar rotación basada en dirección
+                fish.rotation = Math.atan2(fish.vy, fish.vx);
 
-                // Dibujar pez
-                drawScaledFish(fish, ctx);
+                try {
+                    ctx.save();
+                    ctx.translate(fish.x, fish.y);
+                    ctx.rotate(fish.rotation);
+                    
+                    // Aplicar suavizado para mejor calidad
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    
+                    ctx.scale(fish.scale, fish.scale);
+                    ctx.drawImage(fish.canvas, -fish.canvas.width / 2, -fish.canvas.height / 2);
+                    ctx.restore();
+                } catch (e) {
+                    console.warn('Error dibujando pez:', e.message);
+                }
             });
         }
 
-        function drawScaledFish(fish, ctx) {
-            ctx.save();
-            ctx.translate(fish.x, fish.y);
-            ctx.rotate(fish.rotation);
-            ctx.scale(fish.scale, fish.scale);
-            ctx.globalAlpha = 0.8;
+        // ==================== DIBUJAR ARENA ====================
+        function drawSand(ctx, canvas) {
+            ctx.fillStyle = 'rgba(210, 180, 140, 0.8)';
+            ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
 
-            // Crear un canvas temporal para la imagen del pez
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = fish.imageData.width;
-            tempCanvas.height = fish.imageData.height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.putImageData(fish.imageData, 0, 0);
-
-            // Dibujar la imagen del pez escalada
-            ctx.drawImage(
-                tempCanvas,
-                -tempCanvas.width / 2,
-                -tempCanvas.height / 2,
-                tempCanvas.width,
-                tempCanvas.height
-            );
-
-            ctx.restore();
+            ctx.fillStyle = 'rgba(180, 140, 100, 0.4)';
+            for (let i = 0; i < 50; i++) {
+                const x = Math.random() * canvas.width;
+                const y = canvas.height - Math.random() * 30 - 5;
+                const size = Math.random() * 3;
+                ctx.fillRect(x, y, size, size);
+            }
         }
 
-        // ==================== DIBUJAR ONDAS EN LA SUPERFICIE ====================
+        // ==================== DIBUJAR ONDAS ====================
         function drawWaveSurface(ctx, canvas) {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
             ctx.lineWidth = 2;
             ctx.beginPath();
 
-            for (let x = 0; x <= canvas.width; x += 10) {
-                const y = 20 + Math.sin(x * 0.01 + time * 3) * 8;
-                if (x === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
+            const waveHeight = 5;
+            const frequency = 0.02;
+            const phase = time * 2;
 
+            ctx.moveTo(0, canvas.height * 0.2);
+            for (let x = 0; x <= canvas.width; x += 5) {
+                const y = canvas.height * 0.2 + Math.sin(x * frequency + phase) * waveHeight;
+                ctx.lineTo(x, y);
+            }
             ctx.stroke();
         }
 
+        // ==================== ANIMATION LOOP ====================
+        function animationLoop() {
+            time += 1 / 60;
+
+            ctxAquarium.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctxAquarium.fillRect(0, 0, canvasAquariumEl.width, canvasAquariumEl.height);
+
+            drawBackground(ctxAquarium, canvasAquariumEl);
+            drawWaterPlants(ctxAquarium, canvasAquariumEl);
+            drawLightRays(ctxAquarium, canvasAquariumEl);
+            drawBubbles(ctxAquarium, canvasAquariumEl);
+            drawSand(ctxAquarium, canvasAquariumEl);
+            updateAndDrawFishes(ctxAquarium, canvasAquariumEl);
+            drawWaveSurface(ctxAquarium, canvasAquariumEl);
+
+            requestAnimationFrame(animationLoop);
+        }
+
         // ==================== EVENT LISTENERS ====================
-        btnCapture.addEventListener('click', captureAndProcessImage);
+        btnCapture.addEventListener('click', () => {
+            if (markerDetected || !markerMinAR) {
+                captureAndProcessImage();
+            }
+        });
+
         btnClear.addEventListener('click', () => {
             fishes = [];
             fishCountEl.textContent = '0';
+            console.log('🧹 Acuario limpiado');
         });
 
-        // Control de proyección triple
-        tripleProjectionToggle.addEventListener('change', (e) => {
-            tripleProjectionActive = e.target.checked;
-            canvasAquariumEl.classList.toggle('hidden', tripleProjectionActive);
-            tripleProjectionContainer.classList.toggle('active', tripleProjectionActive);
-            setupAquarium();
+        // ==================== DEBUG - Mostrar información de captura ====================
+        console.log('════════════════════════════════════════════════════════════════');
+        console.log('🖼️  PROCESAMIENTO DE IMAGEN HABILITADO');
+        console.log('════════════════════════════════════════════════════════════════');
+        console.log('📊 Pasos del procesamiento:');
+        console.log('1️⃣  Captura de frame del video');
+        console.log('2️⃣  Conversión a escala de grises');
+        console.log('3️⃣  Aplicación de threshold (umbral)');
+        console.log('4️⃣  Creación de máscara binaria');
+        console.log('5️⃣  Clipping mask con canvas API');
+        console.log('6️⃣  Escala y renderizado en acuario');
+        console.log('════════════════════════════════════════════════════════════════');
+        console.log('✓ Marcadores cargados: Máscara de recorte, Siluetapez');
+
+        // ==================== INICIAR ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('✓ DOM cargado');
+            setTimeout(() => {
+                if (!started) {
+                    started = true;
+                    init();
+                    animationLoop();
+                }
+            }, 1000);
         });
 
-        // Manejar redimensionamiento
-        window.addEventListener('resize', () => {
-            setupAquarium();
-        });
-
-        // ==================== INICIAR CUANDO ESTÉ LISTO ====================
-        function startApp() {
-            console.log('Página lista, iniciando aplicación...');
-            if (!cameraActive) {
-                init().catch(err => console.error('Error en init():', err));
-            }
-        }
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', startApp);
-        } else {
-            startApp();
-        }
-
-        // Limpiar al cerrar
+        // Cleanup
         window.addEventListener('beforeunload', () => {
-            console.log('Cerrando aplicación...');
             if (stream) {
-                stream.getTracks().forEach(track => {
-                    track.stop();
-                    console.log('Track detenido');
-                });
+                stream.getTracks().forEach(track => track.stop());
             }
             if (markerMinAR) {
-                markerMinAR.stop().catch(e => console.log('Error deteniendo MindAR:', e));
+                markerMinAR.stop().catch(e => console.log('Error:', e));
             }
         });
     </script>
