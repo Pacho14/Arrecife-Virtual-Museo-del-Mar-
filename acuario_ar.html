@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acuario con AR - MindAR</title>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.11/dist/mindar-image.prod.js"></script>
+    <title>Mi Acuario AR - Detección Automática</title>
+    <!-- MindAR Library con Detección Automática -->
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-three.prod.js" onerror="window.MINDAR_FAILED=true"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <style>
         * {
             margin: 0;
@@ -14,738 +17,644 @@
 
         body {
             font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #f0f0f0;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 1200px;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
         }
 
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
             color: white;
-            padding: 30px;
+            padding: 20px;
             text-align: center;
         }
 
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+            font-size: 2em;
+            margin: 0;
         }
 
-        .header p {
-            font-size: 1.1em;
-            opacity: 0.9;
-        }
-
-        .content {
+        .container {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            padding: 30px;
-            min-height: 600px;
+            grid-template-columns: 1fr 1fr 350px;
+            gap: 15px;
+            padding: 15px;
+            flex: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
         }
 
-        @media (max-width: 768px) {
-            .content {
-                grid-template-columns: 1fr;
-                min-height: auto;
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
             }
         }
 
-        .camera-section {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .camera-section h2,
-        .aquarium-section h2 {
-            font-size: 1.5em;
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        #canvas-camera {
-            display: none;
-        }
-
-        #video-camera {
-            border: 3px solid #667eea;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        button {
-            flex: 1;
-            padding: 15px 25px;
-            font-size: 1em;
-            font-weight: bold;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            min-width: 150px;
-        }
-
-        .btn-capture {
-            background: #4CAF50;
-            color: white;
-        }
-
-        .btn-capture:hover {
-            background: #45a049;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
-        }
-
-        .btn-capture:disabled {
-            background: #cccccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-clear {
-            background: #f44336;
-            color: white;
-        }
-
-        .btn-clear:hover {
-            background: #da190b;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
-        }
-
-        .status {
-            padding: 15px;
-            background: #f5f5f5;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: bold;
-            color: #667eea;
-        }
-
-        .status.detected {
-            background: #e8f5e9;
-            color: #4CAF50;
-        }
-
-        .status.not-detected {
-            background: #ffebee;
-            color: #f44336;
-        }
-
-        .aquarium-section {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        #canvas-aquarium {
-            width: 100%;
-            height: 400px;
-            background: linear-gradient(to bottom, #87CEEB 0%, #4A90E2 50%, #2E5C8A 100%);
+        /* PANEL AR */
+        .ar-section {
+            background: white;
             border-radius: 10px;
-            border: 3px solid #667eea;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .ar-section h2 {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            margin: 0;
+            font-size: 1.1em;
+        }
+
+        #canvas-ar {
+            width: 100%;
+            height: 500px;
+            background: #000;
             display: block;
         }
 
-        .fish-count {
-            padding: 10px;
-            background: #f5f5f5;
-            border-radius: 8px;
-            text-align: center;
+        .ar-status {
+            padding: 12px 15px;
+            background: #ecf0f1;
+            color: #2c3e50;
             font-weight: bold;
-            color: #333;
-        }
-
-        .instructions {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 15px;
-            border-radius: 4px;
-            margin-bottom: 20px;
+            text-align: center;
             font-size: 0.95em;
         }
 
-        .instructions h3 {
-            color: #856404;
-            margin-bottom: 10px;
+        /* PANEL PREVIEW 3D */
+        .preview-section {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
         }
 
-        .instructions ol {
-            margin-left: 20px;
-            color: #856404;
+        .preview-section h2 {
+            background: #27ae60;
+            color: white;
+            padding: 15px;
+            margin: 0;
+            font-size: 1.1em;
         }
 
-        .instructions li {
-            margin-bottom: 8px;
+        #canvas-preview {
+            width: 100%;
+            height: 300px;
+            background: #1e3c72;
+            display: block;
         }
 
-        #hidden-camera {
+        .preview-info {
+            padding: 12px 15px;
+            background: #f9f9f9;
+            border-top: 1px solid #e0e0e0;
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        /* PANEL CONTROLES */
+        .controls-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .controls-section h2 {
+            color: #2c3e50;
+            margin: 0;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .info-box {
+            background: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #2c3e50;
+            line-height: 1.5;
+        }
+
+        .stats {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            color: #555;
+        }
+
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .stats-item:last-child {
+            border-bottom: none;
+        }
+
+        .btn-enviar {
+            padding: 15px;
+            font-size: 1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #ccc;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .btn-enviar:enabled {
+            background: #27ae60;
+            color: white;
+            cursor: pointer;
+        }
+
+        .btn-enviar:enabled:hover {
+            background: #229954;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #e74c3c;
+            margin-right: 8px;
+        }
+
+        .status-indicator.active {
+            background: #27ae60;
+        }
+
+        #aquarium-canvas {
+            width: 100%;
+            min-height: 200px;
+            background: linear-gradient(to bottom, #87CEEB 0%, #4A90E2 50%, #2E5C8A 100%);
+            border: 2px solid #3498db;
+            border-radius: 6px;
+            margin-top: 10px;
             display: none;
+        }
+
+        .aquarium-label {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #555;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
+    <div class="header">
+        <h1>🐠 Mi Acuario AR - Detección Automática 🐠</h1>
+    </div>
+
     <div class="container">
-        <div class="header">
-            <h1>🐠 Acuario AR 🐠</h1>
-            <p>Detecta marcadores, captura peces con procesamiento inteligente y acumúlalos en el acuario</p>
+        <!-- PANEL AR -->
+        <div class="ar-section">
+            <h2>📸 Cámara AR</h2>
+            <canvas id="canvas-ar"></canvas>
+            <div class="ar-status" id="ar-status">🔴 Escaneando marcador...</div>
         </div>
 
-        <div class="instructions">
-            <h3>📋 Instrucciones:</h3>
-            <ol>
-                <li>Asegúrate de que tu cámara esté habilitada</li>
-                <li>Apunta a uno de los marcadores (Máscara de recorte o Siluetapez)</li>
-                <li>Cuando aparezca el botón verde, captura la imagen</li>
-                <li>El sistema analiza automáticamente la imagen con máscara de recorte</li>
-                <li>Los peces aparecerán nadando en el acuario con transparencia</li>
-                <li>¡Captura múltiples veces para llenar el acuario!</li>
-            </ol>
+        <!-- PANEL PREVIEW 3D -->
+        <div class="preview-section">
+            <h2>🐟 Preview 3D</h2>
+            <canvas id="canvas-preview"></canvas>
+            <div class="preview-info">
+                <strong id="preview-title">Esperando detección...</strong><br>
+                <small id="preview-detail">Apunta la cámara al marcador Plantilla 1.mind</small>
+            </div>
         </div>
 
-        <div class="content">
-            <div class="camera-section">
-                <h2>📸 Cámara AR</h2>
-                <video id="video-camera" autoplay muted playsinline webkit-playsinline style="width: 100%; height: 400px; border-radius: 10px; background: #000; object-fit: cover;"></video>
-                <div id="status" class="status not-detected">🔴 Detectando marcador...</div>
-                <div class="button-group">
-                    <button id="btn-capture" class="btn-capture">Capturar Pez</button>
-                    <button id="btn-clear" class="btn-clear">Limpiar Acuario</button>
+        <!-- PANEL CONTROLES -->
+        <div class="controls-section">
+            <h2>⚙️ Controles</h2>
+
+            <div class="info-box">
+                <strong>📋 Instrucciones:</strong><br>
+                • Apunta cámara al marcador<br>
+                • Detecta automáticamente<br>
+                • Habilita botón verde<br>
+                • ¡Agrega al acuario!
+            </div>
+
+            <button id="btn-enviar" class="btn-enviar" disabled>
+                📥 Enviar al Entorno
+            </button>
+
+            <div class="stats">
+                <div class="stats-item">
+                    <span>Estado:</span>
+                    <span><span class="status-indicator" id="status-dot"></span><span id="status-text">Inactivo</span></span>
+                </div>
+                <div class="stats-item">
+                    <span>Modelo:</span>
+                    <span id="stat-model">Pez1.glb</span>
+                </div>
+                <div class="stats-item">
+                    <span>Marcador:</span>
+                    <span id="stat-marker">Plantilla 1.mind</span>
+                </div>
+                <div class="stats-item">
+                    <span>Peces:</span>
+                    <span id="stat-count">0</span>
                 </div>
             </div>
 
-            <div class="aquarium-section">
-                <h2>🐟 Mi Acuario</h2>
-                <canvas id="canvas-aquarium"></canvas>
-                <div class="fish-count">
-                    peces en el acuario: <span id="fish-count">0</span>
-                </div>
-            </div>
+            <div class="aquarium-label">Acuario:</div>
+            <canvas id="aquarium-canvas"></canvas>
         </div>
     </div>
 
     <script>
-        // ==================== VARIABLES GLOBALES ====================
-        let cameraActive = false;
+        let mindarController = null;
+        let scene, camera, renderer;
+        let previewScene, previewCamera, previewRenderer;
+        let aquariumScene, aquariumCamera, aquariumRenderer;
+        let modelGLTF = null;
+        let currentModelAdded = null;
+        let aquariumFishes = [];
         let markerDetected = false;
-        let stream = null;
-        let fishes = [];
-        let markerMinAR = null;
-        let started = false;
-        let time = 0;
+        let arAnchor = null;
 
-        // ==================== ELEMENTOS DEL DOM ====================
-        const videoCameraEl = document.getElementById('video-camera');
-        const canvasAquariumEl = document.getElementById('canvas-aquarium');
-        const ctxAquarium = canvasAquariumEl.getContext('2d');
-        const statusEl = document.getElementById('status');
-        const btnCapture = document.getElementById('btn-capture');
-        const btnClear = document.getElementById('btn-clear');
-        const fishCountEl = document.getElementById('fish-count');
+        const btnEnviar = document.getElementById('btn-enviar');
+        const arStatus = document.getElementById('ar-status');
+        const previewTitle = document.getElementById('preview-title');
+        const previewDetail = document.getElementById('preview-detail');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const statCount = document.getElementById('stat-count');
+        const aquariumCanvas = document.getElementById('aquarium-canvas');
 
-        // ==================== INICIALIZACIÓN ====================
-        async function init() {
+        async function initAR() {
             try {
-                console.log('=== INICIANDO APLICACIÓN ===');
-                statusEl.textContent = '⏳ Solicitando acceso a cámara...';
+                console.log('=== INICIANDO AR ===');
+                arStatus.textContent = '⏳ Inicializando AR...';
 
-                // Obtener cámara
-                try {
-                    console.log('Intentando obtener cámara...');
-                    stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { 
-                            facingMode: 'environment',
-                            width: { ideal: 1280 },
-                            height: { ideal: 720 }
-                        },
-                        audio: false
-                    });
-                    console.log('✓ Cámara trasera obtenida');
-                } catch (err) {
-                    console.log('Cámara trasera falló, intentando cualquier cámara:', err.message);
-                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                    console.log('✓ Cámara genérica obtenida');
-                }
+                const canvas = document.getElementById('canvas-ar');
 
-                videoCameraEl.srcObject = stream;
-                cameraActive = true;
-                console.log('✓ Stream asignado a video element');
+                scene = new THREE.Scene();
+                camera = new THREE.PerspectiveCamera(
+                    75,
+                    canvas.clientWidth / canvas.clientHeight,
+                    0.1,
+                    1000
+                );
+                renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+                renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+                renderer.setClearColor(0x000000, 0);
 
-                // Esperar a que video esté listo
-                await new Promise(resolve => {
-                    let attempts = 0;
-                    const checkVideo = setInterval(() => {
-                        attempts++;
-                        if (videoCameraEl.readyState >= 2 && videoCameraEl.videoWidth > 0) {
-                            clearInterval(checkVideo);
-                            console.log('✓ Video ready');
-                            resolve();
-                        } else if (attempts > 50) {
-                            clearInterval(checkVideo);
-                            console.warn('⚠ Timeout esperando video');
-                            resolve();
-                        }
-                    }, 100);
-                });
+                const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+                scene.add(light);
 
-                // Configurar acuario
-                console.log('Configurando acuario...');
-                setupAquarium();
-                console.log('✓ Acuario listo');
+                console.log('✓ Escena Three.js creada');
 
-                // Inicializar MindAR
-                console.log('Intentando inicializar MindAR...');
-                initializeMindAR().then(() => {
-                    console.log('✓ MindAR inicializado');
-                }).catch(err => {
-                    console.warn('⚠ MindAR no disponible');
-                    btnCapture.disabled = false;
-                    statusEl.textContent = '📸 Captura manual (sin AR)';
-                    statusEl.classList.remove('not-detected');
-                });
+                initPreview();
+                console.log('✓ Preview 3D listo');
 
-                console.log('=== INICIALIZACIÓN COMPLETADA ===');
-                statusEl.textContent = '🔴 Detectando marcador...';
+                await loadGLBModel('./Pez1.glb');
+                console.log('✓ GLB modelo cargado y visible');
+
+                initAquarium();
+                console.log('✓ Acuario inicializado');
+
+                await initMindAR();
+
+                renderARLoop();
 
             } catch (error) {
-                console.error('❌ ERROR:', error.message);
-                let errorMsg = '❌ Error desconocido';
-                if (error.name === 'NotAllowedError') {
-                    errorMsg = '❌ Debes permitir acceso a la cámara';
-                } else if (error.name === 'NotFoundError') {
-                    errorMsg = '❌ Cámara no disponible';
-                }
-                statusEl.textContent = errorMsg;
+                console.error('Error en AR:', error);
+                arStatus.textContent = '❌ Error: ' + error.message;
             }
         }
 
-        // ==================== INICIALIZAR MINDAR ====================
-        function initializeMindAR() {
+        async function initMindAR() {
             return new Promise(async (resolve, reject) => {
                 try {
-                    if (!window.MINDAR) {
-                        throw new Error('MindAR no cargado');
+                    if (window.MINDAR_FAILED || !window.MINDAR) {
+                        throw new Error('MindAR no disponible');
                     }
 
-                    // Cargar archivos mind
-                    console.log('📂 Cargando archivos mind...');
-                    const responseMascara = await fetch('./Mascara de recorte.mind');
-                    const bufferMascara = await responseMascara.arrayBuffer();
-                    console.log('✓ Mascara de recorte.mind cargado');
+                    console.log('Cargando archivo Plantilla 1.mind...');
+                    const response = await fetch('./Plantilla 1.mind');
+                    if (!response.ok) throw new Error('Plantilla 1.mind no encontrado');
+                    const buffer = await response.arrayBuffer();
+                    console.log('✓ Plantilla 1.mind cargado');
 
-                    const responseSilueta = await fetch('./Siluetapez.mind');
-                    const bufferSilueta = await responseSilueta.arrayBuffer();
-                    console.log('✓ Siluetapez.mind cargado');
+                    const { Compiler } = window.MINDAR.IMAGE;
+                    const canvas = document.getElementById('canvas-ar');
 
-                    // Inicializar MindAR
-                    markerMinAR = new window.MINDAR.IMAGE.Anchor({
-                        buffers: [bufferMascara, bufferSilueta]
+                    const compiler = new Compiler();
+                    const { features, dimensions } = await compiler.compile(
+                        ['Plantilla 1.mind'],
+                        [buffer]
+                    );
+
+                    console.log('✓ MindAR compilado');
+
+                    const controller = new window.MINDAR.IMAGE.Controller({
+                        canvas: canvas,
+                        imageTargetSrc: features,
+                        onUpdate: onARUpdate,
+                        autoStart: true
                     });
 
-                    console.log('✓ MindAR inicializado correctamente con 2 marcadores');
-                    monitorMarkerDetection();
+                    mindarController = controller;
+                    arAnchor = controller.addAnchor(0);
+                    console.log('✓ Anchor agregado');
+
+                    controller.addListener('targetFound', onTargetFound);
+                    controller.addListener('targetLost', onTargetLost);
+
+                    arStatus.textContent = '🔴 Escaneando marcador...';
                     resolve();
 
                 } catch (error) {
-                    console.error('❌ Error en MindAR:', error.message);
-                    reject(error);
+                    console.warn('MindAR no disponible:', error.message);
+                    arStatus.textContent = '⚠️ AR no disponible';
+                    btnEnviar.disabled = false;
+                    resolve();
                 }
             });
         }
 
-        // ==================== MONITOREAR DETECCIÓN ====================
-        function monitorMarkerDetection() {
-            console.log('🔍 Monitoreando marcadores');
-            let lastDetected = false;
+        async function loadGLBModel(path) {
+            return new Promise((resolve, reject) => {
+                const loader = new THREE.GLTFLoader();
+                loader.load(
+                    path,
+                    (gltf) => {
+                        modelGLTF = gltf;
+                        const model = gltf.scene;
 
-            const detectLoop = setInterval(async () => {
-                if (!cameraActive || !markerMinAR) return;
+                        const box = new THREE.Box3().setFromObject(model);
+                        const size = box.getSize(new THREE.Vector3());
+                        const maxDim = Math.max(size.x, size.y, size.z);
+                        const scale = 1 / maxDim;
+                        model.scale.multiplyScalar(scale);
 
-                try {
-                    const estimates = await markerMinAR.estimate(videoCameraEl);
-                    const isDetected = estimates && estimates.length > 0;
+                        const center = box.getCenter(new THREE.Vector3());
+                        model.position.sub(center);
 
-                    if (isDetected && !lastDetected) {
-                        console.log('🎯 ¡MARCADOR DETECTADO!');
-                        markerDetected = true;
-                        statusEl.textContent = '🟢 ¡Marcador detectado!';
-                        statusEl.classList.remove('not-detected');
-                        statusEl.classList.add('detected');
-                        btnCapture.disabled = false;
-                        lastDetected = true;
-                    } else if (!isDetected && lastDetected) {
-                        console.log('❌ Marcador perdido');
-                        markerDetected = false;
-                        statusEl.textContent = '🔴 Detectando marcador...';
-                        statusEl.classList.remove('detected');
-                        statusEl.classList.add('not-detected');
-                        btnCapture.disabled = true;
-                        lastDetected = false;
+                        // Agregar al anchor AR
+                        if (arAnchor) {
+                            arAnchor.group.add(model);
+                        }
+
+                        // 🎯 MOSTRAR EL MODELO EN EL PREVIEW 3D INMEDIATAMENTE
+                        const previewModel = gltf.scene.clone();
+                        previewModel.scale.multiplyScalar(scale);
+                        previewModel.position.sub(center);
+                        previewScene.add(previewModel);
+                        currentModelAdded = previewModel;
+
+                        console.log('✓ Modelo GLB listo y visible en preview');
+                        previewTitle.textContent = '✓ Pez1.glb cargado';
+                        previewDetail.textContent = 'Gira automáticamente 360°';
+
+                        resolve(gltf);
+                    },
+                    undefined,
+                    (error) => {
+                        console.error('Error cargando GLB:', error);
+                        reject(error);
                     }
-                } catch (e) {
-                    // Error ignorable
-                }
-            }, 100);
+                );
+            });
         }
 
-        // ==================== CAPTURAR Y PROCESAR IMAGEN ====================
-        function captureAndProcessImage() {
-            if (!cameraActive) {
-                alert('La cámara no está activa');
+        function onTargetFound() {
+            console.log('🎯 ¡MARCADOR DETECTADO!');
+            markerDetected = true;
+            arStatus.textContent = '🟢 ✓ Marcador detectado';
+            arStatus.style.background = '#d5f4e6';
+            arStatus.style.color = '#27ae60';
+
+            statusDot.classList.add('active');
+            statusText.textContent = 'Detectado';
+
+            btnEnviar.disabled = false;
+            previewTitle.textContent = '✓ Pez1.glb detectado';
+            previewDetail.textContent = 'Presiona "Enviar al Entorno"';
+        }
+
+        function onTargetLost() {
+            console.log('❌ Marcador perdido');
+            markerDetected = false;
+            arStatus.textContent = '🔴 Escaneando marcador...';
+            arStatus.style.background = '#ecf0f1';
+            arStatus.style.color = '#2c3e50';
+
+            statusDot.classList.remove('active');
+            statusText.textContent = 'Esperando';
+
+            previewDetail.textContent = 'Marcador perdido - Presiona botón para enviar';
+        }
+
+        function onARUpdate() {
+            if (mindarController && mindarController.frame) {
+                const { videoMatrix, worldMatrix } = mindarController.frame;
+                camera.projectionMatrix.fromArray(videoMatrix);
+                if (arAnchor) {
+                    arAnchor.group.matrix.fromArray(worldMatrix);
+                }
+            }
+        }
+
+        function initPreview() {
+            const canvas = document.getElementById('canvas-preview');
+
+            previewScene = new THREE.Scene();
+            previewScene.background = new THREE.Color(0x1e3c72);
+
+            previewCamera = new THREE.PerspectiveCamera(
+                75,
+                canvas.clientWidth / canvas.clientHeight,
+                0.1,
+                1000
+            );
+            previewCamera.position.z = 2;
+
+            previewRenderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            previewRenderer.setSize(canvas.clientWidth, canvas.clientHeight);
+
+            const light1 = new THREE.DirectionalLight(0xffffff, 1);
+            light1.position.set(5, 5, 5);
+            previewScene.add(light1);
+
+            const light2 = new THREE.DirectionalLight(0xffffff, 0.5);
+            light2.position.set(-5, -5, 5);
+            previewScene.add(light2);
+
+            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+            previewScene.add(ambient);
+
+            function animatePreview() {
+                requestAnimationFrame(animatePreview);
+
+                if (currentModelAdded) {
+                    currentModelAdded.rotation.y += 0.005;
+                    currentModelAdded.rotation.x += 0.002;
+                }
+
+                previewRenderer.render(previewScene, previewCamera);
+            }
+            animatePreview();
+
+            window.addEventListener('resize', () => {
+                const width = canvas.clientWidth;
+                const height = canvas.clientHeight;
+                previewCamera.aspect = width / height;
+                previewCamera.updateProjectionMatrix();
+                previewRenderer.setSize(width, height);
+            });
+        }
+
+        function initAquarium() {
+            const canvas = aquariumCanvas;
+            if (!canvas) return;
+
+            canvas.style.display = 'block';
+
+            // Crear escena Three.js para el acuario
+            aquariumScene = new THREE.Scene();
+            aquariumScene.background = new THREE.Color(0x1e3c72);
+            aquariumScene.fog = new THREE.Fog(0x1e3c72, 30, 50);
+
+            aquariumCamera = new THREE.PerspectiveCamera(
+                75,
+                canvas.clientWidth / canvas.clientHeight,
+                0.1,
+                1000
+            );
+            aquariumCamera.position.set(0, 2, 5);
+            aquariumCamera.lookAt(0, 0, 0);
+
+            aquariumRenderer = new THREE.WebGLRenderer({ 
+                canvas: canvas, 
+                antialias: true,
+                alpha: true 
+            });
+            aquariumRenderer.setSize(canvas.clientWidth, canvas.clientHeight);
+            aquariumRenderer.setPixelRatio(window.devicePixelRatio);
+
+            // Iluminación
+            const ambientLight = new THREE.AmbientLight(0x87ceeb, 0.7);
+            aquariumScene.add(ambientLight);
+
+            const light1 = new THREE.DirectionalLight(0xffffff, 0.8);
+            light1.position.set(5, 5, 5);
+            aquariumScene.add(light1);
+
+            // Suelo (arena)
+            const groundGeometry = new THREE.PlaneGeometry(20, 20);
+            const groundMaterial = new THREE.MeshStandardMaterial({
+                color: 0xd9b89a,
+                roughness: 0.8
+            });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -2;
+            aquariumScene.add(ground);
+
+            // Render loop del acuario
+            let rotationAngle = 0;
+            function animateAquarium() {
+                requestAnimationFrame(animateAquarium);
+                rotationAngle += 0.003;
+
+                // Animar cada pez en el acuario
+                aquariumFishes.forEach((fish, index) => {
+                    if (fish.mesh) {
+                        fish.mesh.position.x = fish.baseX + Math.sin(rotationAngle + index) * 2;
+                        fish.mesh.position.y = fish.baseY + Math.sin(rotationAngle * 0.5 + index) * 0.5;
+                        fish.mesh.position.z = fish.baseZ + Math.cos(rotationAngle + index) * 2;
+                        fish.mesh.rotation.y += 0.01;
+                    }
+                });
+
+                aquariumRenderer.render(aquariumScene, aquariumCamera);
+            }
+            animateAquarium();
+
+            // Resize
+            window.addEventListener('resize', () => {
+                const width = canvas.clientWidth;
+                const height = canvas.clientHeight;
+                aquariumCamera.aspect = width / height;
+                aquariumCamera.updateProjectionMatrix();
+                aquariumRenderer.setSize(width, height);
+            });
+        }
+
+        btnEnviar.addEventListener('click', () => {
+            if (!modelGLTF) {
+                alert('El modelo aún se está cargando...');
                 return;
             }
 
-            try {
-                console.log('📸 Capturando pez con procesamiento avanzado...');
-                
-                // PASO 1: Capturar frame del video
-                const captureCanvas = document.createElement('canvas');
-                captureCanvas.width = videoCameraEl.videoWidth;
-                captureCanvas.height = videoCameraEl.videoHeight;
-                const captureCtx = captureCanvas.getContext('2d');
+            // Clonar el modelo 3D para agregarlo al acuario
+            const clonedPez = modelGLTF.scene.clone();
+            
+            // Posición aleatoria en el acuario
+            const baseX = Math.random() * 6 - 3;
+            const baseY = Math.random() * 3 - 1;
+            const baseZ = Math.random() * 6 - 3;
+            
+            clonedPez.position.set(baseX, baseY, baseZ);
+            clonedPez.scale.multiplyScalar(0.8);
+            
+            aquariumScene.add(clonedPez);
 
-                captureCtx.drawImage(videoCameraEl, 0, 0, captureCanvas.width, captureCanvas.height);
-                console.log('✓ Frame capturado:', captureCanvas.width, 'x', captureCanvas.height);
-
-                // PASO 2: Obtener datos de imagen
-                const imageData = captureCtx.getImageData(0, 0, captureCanvas.width, captureCanvas.height);
-                const data = imageData.data;
-
-                // PASO 3: Convertir a escala de grises y crear máscara
-                console.log('🔍 Analizando imagen...');
-                const grayData = new Uint8ClampedArray(captureCanvas.width * captureCanvas.height);
-                
-                for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i];
-                    const g = data[i + 1];
-                    const b = data[i + 2];
-                    
-                    // Fórmula de conversión a escala de grises
-                    const gray = (0.299 * r + 0.587 * g + 0.114 * b);
-                    const pixelIndex = i / 4;
-                    grayData[pixelIndex] = gray;
-                }
-
-                // PASO 4: Aplicar threshold (umbral)
-                const threshold = 180; // Detecta áreas oscuras (negro/pez)
-                console.log('📊 Aplicando threshold:', threshold);
-                const binaryMask = new Uint8ClampedArray(captureCanvas.width * captureCanvas.height);
-                
-                for (let i = 0; i < grayData.length; i++) {
-                    // Negro (oscuro) = 255 (válido), Blanco = 0 (eliminar)
-                    binaryMask[i] = grayData[i] < threshold ? 255 : 0;
-                }
-
-                // PASO 5: Crear máscara binaria y aplicar clipping
-                console.log('🎨 Creando máscara de recorte...');
-                const maskImageData = new ImageData(
-                    new Uint8ClampedArray(captureCanvas.width * captureCanvas.height * 4),
-                    captureCanvas.width,
-                    captureCanvas.height
-                );
-
-                for (let i = 0; i < binaryMask.length; i++) {
-                    const pixelPos = i * 4;
-                    const origPixelPos = i * 4;
-                    
-                    if (binaryMask[i] > 128) {
-                        // Área válida: mantener píxel original
-                        maskImageData.data[pixelPos] = data[origPixelPos];        // R
-                        maskImageData.data[pixelPos + 1] = data[origPixelPos + 1]; // G
-                        maskImageData.data[pixelPos + 2] = data[origPixelPos + 2]; // B
-                        maskImageData.data[pixelPos + 3] = 255; // A (opaco)
-                    } else {
-                        // Área de fondo: transparente
-                        maskImageData.data[pixelPos + 3] = 0; // A (transparente)
-                    }
-                }
-
-                // PASO 6: Dibujar máscara en canvas
-                const maskCanvas = document.createElement('canvas');
-                maskCanvas.width = captureCanvas.width;
-                maskCanvas.height = captureCanvas.height;
-                const maskCtx = maskCanvas.getContext('2d');
-                maskCtx.putImageData(maskImageData, 0, 0);
-
-                console.log('✓ Máscara aplicada');
-
-                // PASO 7: Crear canvas final escalado para el acuario
-                const finalCanvas = document.createElement('canvas');
-                finalCanvas.width = 200;
-                finalCanvas.height = 200;
-                const finalCtx = finalCanvas.getContext('2d');
-
-                // Dibujar imagen enmascarada escalada
-                const scale = Math.max(finalCanvas.width / maskCanvas.width, finalCanvas.height / maskCanvas.height);
-                const x = (finalCanvas.width - maskCanvas.width * scale) / 2;
-                const y = (finalCanvas.height - maskCanvas.height * scale) / 2;
-                
-                finalCtx.drawImage(maskCanvas, x, y, maskCanvas.width * scale, maskCanvas.height * scale);
-
-                // Añadir al acuario
-                addFishToAquarium(finalCanvas);
-                console.log('✓ Pez procesado y añadido al acuario');
-
-            } catch (error) {
-                console.error('❌ Error en captura:', error.message);
-                alert('Error al capturar: ' + error.message);
-            }
-        }
-
-        // ==================== AÑADIR PEZ AL ACUARIO ====================
-        function addFishToAquarium(canvas) {
-            const fish = {
-                canvas: canvas,
-                x: Math.random() * (canvasAquariumEl.width - 80),
-                y: Math.random() * (canvasAquariumEl.height * 0.5) + canvasAquariumEl.height * 0.25,
-                vx: (Math.random() - 0.5) * 4,
-                vy: (Math.random() - 0.5) * 2,
-                scale: 0.4 + Math.random() * 0.2,
-                rotation: Math.random() * Math.PI * 2
-            };
-
-            fishes.push(fish);
-            fishCountEl.textContent = fishes.length;
-            console.log('🐠 Pez #' + fishes.length + ' capturado, escala:', fish.scale.toFixed(2));
-        }
-
-        // ==================== CONFIGURAR ACUARIO ====================
-        function setupAquarium() {
-            canvasAquariumEl.width = canvasAquariumEl.clientWidth;
-            canvasAquariumEl.height = canvasAquariumEl.clientHeight;
-            console.log('Canvas size:', canvasAquariumEl.width, 'x', canvasAquariumEl.height);
-        }
-
-        // ==================== DIBUJAR FONDO ====================
-        function drawBackground(ctx, canvas) {
-            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            gradient.addColorStop(0, '#87CEEB');
-            gradient.addColorStop(0.5, '#4A90E2');
-            gradient.addColorStop(1, '#2E5C8A');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-
-        // ==================== DIBUJAR PLANTAS ACUÁTICAS ====================
-        function drawWaterPlants(ctx, canvas) {
-            ctx.strokeStyle = 'rgba(34, 139, 34, 0.6)';
-            ctx.lineWidth = 3;
-
-            const plantPositions = [50, 200, 350, canvas.width - 100];
-            plantPositions.forEach((x, i) => {
-                drawPlant(x, canvas.height, i, ctx);
+            // Guardar referencia al pez
+            aquariumFishes.push({
+                mesh: clonedPez,
+                baseX: baseX,
+                baseY: baseY,
+                baseZ: baseZ
             });
-        }
 
-        function drawPlant(x, y, index, ctx) {
-            ctx.beginPath();
-            ctx.moveTo(x, y);
+            statCount.textContent = aquariumFishes.length;
+            console.log(`✓ Pez ${aquariumFishes.length} agregado al acuario`);
 
-            for (let i = 0; i < 5; i++) {
-                const px = x + Math.sin(time * 2 + index + i * 0.5) * 20;
-                const py = y - i * 30;
-                ctx.lineTo(px, py);
-            }
-            ctx.stroke();
-        }
-
-        // ==================== DIBUJAR RAYOS DE LUZ ====================
-        function drawLightRays(ctx, canvas) {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.lineWidth = 15;
-
-            for (let i = 0; i < 3; i++) {
-                const x = (i * canvas.width + time * 100) % canvas.width;
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x + 30, canvas.height);
-                ctx.stroke();
-            }
-        }
-
-        // ==================== DIBUJAR BURBUJAS ====================
-        const bubbles = [];
-        function drawBubbles(ctx, canvas) {
-            if (Math.random() < 0.03) {
-                bubbles.push({
-                    x: Math.random() * canvas.width,
-                    y: canvas.height,
-                    radius: Math.random() * 5 + 2,
-                    vy: -Math.random() * 1 - 0.5,
-                    vx: (Math.random() - 0.5) * 0.5
-                });
-            }
-
-            for (let i = bubbles.length - 1; i >= 0; i--) {
-                const bubble = bubbles[i];
-                bubble.x += bubble.vx;
-                bubble.y += bubble.vy;
-
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.beginPath();
-                ctx.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-
-                if (bubble.y < 0) {
-                    bubbles.splice(i, 1);
-                }
-            }
-        }
-
-        // ==================== ACTUALIZAR Y DIBUJAR PECES ====================
-        function updateAndDrawFishes(ctx, canvas) {
-            fishes.forEach(fish => {
-                // Actualizar posición
-                fish.x += fish.vx;
-                fish.y += fish.vy;
-
-                // Rebotar en los límites
-                if (fish.x < 0 || fish.x > canvas.width) {
-                    fish.vx *= -1;
-                }
-                if (fish.y < 0 || fish.y > canvas.height) {
-                    fish.vy *= -1;
-                }
-
-                // Actualizar rotación basada en dirección
-                fish.rotation = Math.atan2(fish.vy, fish.vx);
-
-                try {
-                    ctx.save();
-                    ctx.translate(fish.x, fish.y);
-                    ctx.rotate(fish.rotation);
-                    
-                    // Aplicar suavizado para mejor calidad
-                    ctx.imageSmoothingEnabled = true;
-                    ctx.imageSmoothingQuality = 'high';
-                    
-                    ctx.scale(fish.scale, fish.scale);
-                    ctx.drawImage(fish.canvas, -fish.canvas.width / 2, -fish.canvas.height / 2);
-                    ctx.restore();
-                } catch (e) {
-                    console.warn('Error dibujando pez:', e.message);
-                }
-            });
-        }
-
-        // ==================== DIBUJAR ARENA ====================
-        function drawSand(ctx, canvas) {
-            ctx.fillStyle = 'rgba(210, 180, 140, 0.8)';
-            ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
-
-            ctx.fillStyle = 'rgba(180, 140, 100, 0.4)';
-            for (let i = 0; i < 50; i++) {
-                const x = Math.random() * canvas.width;
-                const y = canvas.height - Math.random() * 30 - 5;
-                const size = Math.random() * 3;
-                ctx.fillRect(x, y, size, size);
-            }
-        }
-
-        // ==================== DIBUJAR ONDAS ====================
-        function drawWaveSurface(ctx, canvas) {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-
-            const waveHeight = 5;
-            const frequency = 0.02;
-            const phase = time * 2;
-
-            ctx.moveTo(0, canvas.height * 0.2);
-            for (let x = 0; x <= canvas.width; x += 5) {
-                const y = canvas.height * 0.2 + Math.sin(x * frequency + phase) * waveHeight;
-                ctx.lineTo(x, y);
-            }
-            ctx.stroke();
-        }
-
-        // ==================== ANIMATION LOOP ====================
-        function animationLoop() {
-            time += 1 / 60;
-
-            ctxAquarium.fillStyle = 'rgba(0, 0, 0, 0.05)';
-            ctxAquarium.fillRect(0, 0, canvasAquariumEl.width, canvasAquariumEl.height);
-
-            drawBackground(ctxAquarium, canvasAquariumEl);
-            drawWaterPlants(ctxAquarium, canvasAquariumEl);
-            drawLightRays(ctxAquarium, canvasAquariumEl);
-            drawBubbles(ctxAquarium, canvasAquariumEl);
-            drawSand(ctxAquarium, canvasAquariumEl);
-            updateAndDrawFishes(ctxAquarium, canvasAquariumEl);
-            drawWaveSurface(ctxAquarium, canvasAquariumEl);
-
-            requestAnimationFrame(animationLoop);
-        }
-
-        // ==================== EVENT LISTENERS ====================
-        btnCapture.addEventListener('click', () => {
-            if (markerDetected || !markerMinAR) {
-                captureAndProcessImage();
-            }
-        });
-
-        btnClear.addEventListener('click', () => {
-            fishes = [];
-            fishCountEl.textContent = '0';
-            console.log('🧹 Acuario limpiado');
-        });
-
-        // ==================== DEBUG - Mostrar información de captura ====================
-        console.log('════════════════════════════════════════════════════════════════');
-        console.log('🖼️  PROCESAMIENTO DE IMAGEN HABILITADO');
-        console.log('════════════════════════════════════════════════════════════════');
-        console.log('📊 Pasos del procesamiento:');
-        console.log('1️⃣  Captura de frame del video');
-        console.log('2️⃣  Conversión a escala de grises');
-        console.log('3️⃣  Aplicación de threshold (umbral)');
-        console.log('4️⃣  Creación de máscara binaria');
-        console.log('5️⃣  Clipping mask con canvas API');
-        console.log('6️⃣  Escala y renderizado en acuario');
-        console.log('════════════════════════════════════════════════════════════════');
-        console.log('✓ Marcadores cargados: Máscara de recorte, Siluetapez');
-
-        // ==================== INICIAR ====================
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('✓ DOM cargado');
+            // Deshabilitar botón
+            btnEnviar.disabled = true;
+            btnEnviar.textContent = '✓ ¡Pez agregado!';
             setTimeout(() => {
-                if (!started) {
-                    started = true;
-                    init();
-                    animationLoop();
-                }
-            }, 1000);
+                btnEnviar.textContent = '📥 Enviar al Entorno';
+                btnEnviar.disabled = false;
+            }, 1500);
         });
 
-        // Cleanup
-        window.addEventListener('beforeunload', () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-            if (markerMinAR) {
-                markerMinAR.stop().catch(e => console.log('Error:', e));
-            }
+        function renderARLoop() {
+            renderer.render(scene, camera);
+            requestAnimationFrame(renderARLoop);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('Iniciando aplicación...');
+            initAR();
         });
     </script>
 </body>
