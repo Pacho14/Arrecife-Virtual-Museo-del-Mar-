@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi Acuario AR - Detección Automática</title>
-    <!-- MindAR Library con Detección Automática -->
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-three.prod.js" onerror="window.MINDAR_FAILED=true"></script>
+    <!-- MindAR Library v1.1.5 - Orden correcto para funcionamiento -->
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-three.prod.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <style>
@@ -352,26 +352,29 @@
         async function initMindAR() {
             return new Promise(async (resolve, reject) => {
                 try {
-                    if (window.MINDAR_FAILED || !window.MINDAR) {
-                        throw new Error('MindAR no disponible');
+                    // Verificar que MindAR esté disponible (v1.1.5)
+                    await new Promise(r => setTimeout(r, 500)); // Esperar a que se cargue
+                    
+                    if (!window.MINDAR || !window.MINDAR.IMAGE) {
+                        throw new Error('MindAR no disponible - verifica que los scripts se cargaron');
                     }
 
+                    console.log('✓ MindAR v1.1.5 disponible');
                     console.log('Cargando archivo Plantilla 1.mind...');
                     const response = await fetch('./Plantilla 1.mind');
                     if (!response.ok) throw new Error('Plantilla 1.mind no encontrado');
                     const buffer = await response.arrayBuffer();
-                    console.log('✓ Plantilla 1.mind cargado');
+                    console.log('✓ Plantilla 1.mind cargado (' + buffer.byteLength + ' bytes)');
 
                     const { Compiler } = window.MINDAR.IMAGE;
                     const canvas = document.getElementById('canvas-ar');
 
                     const compiler = new Compiler();
                     const { features, dimensions } = await compiler.compile(
-                        ['Plantilla 1.mind'],
-                        [buffer]
+                        new Uint8Array(buffer)
                     );
 
-                    console.log('✓ MindAR compilado');
+                    console.log('✓ MindAR compilado - Dimensiones:', dimensions);
 
                     const controller = new window.MINDAR.IMAGE.Controller({
                         canvas: canvas,
@@ -384,15 +387,17 @@
                     arAnchor = controller.addAnchor(0);
                     console.log('✓ Anchor agregado');
 
-                    controller.addListener('targetFound', onTargetFound);
-                    controller.addListener('targetLost', onTargetLost);
+                    controller.addEventListener('targetFound', onTargetFound);
+                    controller.addEventListener('targetLost', onTargetLost);
 
+                    console.log('✓ Listeners configurados');
                     arStatus.textContent = '🔴 Escaneando marcador...';
                     resolve();
 
                 } catch (error) {
-                    console.warn('MindAR no disponible:', error.message);
-                    arStatus.textContent = '⚠️ AR no disponible';
+                    console.error('❌ Error en MindAR:', error);
+                    console.error('Stack:', error.stack);
+                    arStatus.textContent = '⚠️ Error: ' + error.message;
                     btnEnviar.disabled = false;
                     resolve();
                 }
