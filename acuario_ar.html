@@ -362,15 +362,27 @@
                     }
 
                     console.log('✓ MindAR v1.1.5 disponible');
-                    console.log('Objetos MINDAR disponibles:', Object.keys(window.MINDAR));
+                    console.log('Estructura MINDAR:', window.MINDAR);
+                    console.log('Objetos MINDAR:', Object.keys(window.MINDAR));
+                    
+                    // Para THREE.js, el Controller está en window.MINDAR.Controller (versión global)
+                    // O podría estar como función directa
+                    let Controller = null;
+                    
+                    if (window.MINDAR.Controller) {
+                        Controller = window.MINDAR.Controller;
+                        console.log('✓ Controller encontrado en window.MINDAR.Controller');
+                    } else if (window.MINDAR.IMAGE && window.MINDAR.IMAGE.Controller) {
+                        Controller = window.MINDAR.IMAGE.Controller;
+                        console.log('✓ Controller encontrado en window.MINDAR.IMAGE.Controller');
+                    } else {
+                        // Intenta acceder directamente
+                        console.log('Intentando acceso directo...');
+                        console.log('window.MINDAR.Controller:', window.MINDAR.Controller);
+                        throw new Error('Controller no encontrado - Estructura MINDAR: ' + JSON.stringify(Object.keys(window.MINDAR)));
+                    }
                     
                     const canvas = document.getElementById('canvas-ar');
-
-                    // Para THREE.js, la API es diferente - no usa .IMAGE
-                    const Controller = window.MINDAR.Controller;
-                    if (!Controller) {
-                        throw new Error('Controller no encontrado en MINDAR');
-                    }
 
                     const controller = new Controller({
                         canvas: canvas,
