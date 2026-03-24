@@ -355,21 +355,27 @@
             return new Promise(async (resolve, reject) => {
                 try {
                     // Verificar que MindAR esté disponible (v1.1.5)
-                    await new Promise(r => setTimeout(r, 500)); // Esperar a que se cargue
+                    await new Promise(r => setTimeout(r, 1000)); // Esperar a que se cargue completamente
                     
-                    if (!window.MINDAR || !window.MINDAR.IMAGE) {
+                    if (!window.MINDAR) {
                         throw new Error('MindAR no disponible - verifica que los scripts se cargaron');
                     }
 
                     console.log('✓ MindAR v1.1.5 disponible');
+                    console.log('Objetos MINDAR disponibles:', Object.keys(window.MINDAR));
+                    
                     const canvas = document.getElementById('canvas-ar');
 
-                    // En v1.1.5, se puede pasar la URL directamente
-                    const controller = new window.MINDAR.IMAGE.Controller({
+                    // Para THREE.js, la API es diferente - no usa .IMAGE
+                    const Controller = window.MINDAR.Controller;
+                    if (!Controller) {
+                        throw new Error('Controller no encontrado en MINDAR');
+                    }
+
+                    const controller = new Controller({
                         canvas: canvas,
                         imageTargetSrc: './Plantilla 1.mind',
-                        onUpdate: onARUpdate,
-                        autoStart: true
+                        onUpdate: onARUpdate
                     });
 
                     mindarController = controller;
@@ -380,6 +386,11 @@
                     controller.addEventListener('targetLost', onTargetLost);
 
                     console.log('✓ Listeners configurados');
+                    
+                    // Iniciar camera stream
+                    await controller.start();
+                    console.log('✓ AR iniciado');
+                    
                     arStatus.textContent = '🔴 Escaneando marcador...';
                     resolve();
 
