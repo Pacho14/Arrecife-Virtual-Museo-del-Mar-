@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi Acuario AR - Detección Automática</title>
-    <!-- MindAR Library v1.1.5 - Orden correcto para funcionamiento -->
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-three.prod.js"></script>
+    <!-- Three.js primero -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- GLTFLoader -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <!-- MindAR después (usa la instancia global de Three.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-three.prod.js"></script>
     <style>
         * {
             margin: 0;
@@ -360,25 +362,12 @@
                     }
 
                     console.log('✓ MindAR v1.1.5 disponible');
-                    console.log('Cargando archivo Plantilla 1.mind...');
-                    const response = await fetch('./Plantilla 1.mind');
-                    if (!response.ok) throw new Error('Plantilla 1.mind no encontrado');
-                    const buffer = await response.arrayBuffer();
-                    console.log('✓ Plantilla 1.mind cargado (' + buffer.byteLength + ' bytes)');
-
-                    const { Compiler } = window.MINDAR.IMAGE;
                     const canvas = document.getElementById('canvas-ar');
 
-                    const compiler = new Compiler();
-                    const { features, dimensions } = await compiler.compile(
-                        new Uint8Array(buffer)
-                    );
-
-                    console.log('✓ MindAR compilado - Dimensiones:', dimensions);
-
+                    // En v1.1.5, se puede pasar la URL directamente
                     const controller = new window.MINDAR.IMAGE.Controller({
                         canvas: canvas,
-                        imageTargetSrc: features,
+                        imageTargetSrc: './Plantilla 1.mind',
                         onUpdate: onARUpdate,
                         autoStart: true
                     });
